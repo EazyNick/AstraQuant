@@ -1,0 +1,7 @@
+# Ignore Python cache files
+*.pyc
+__pycache__/
+
+# Ignore temporary assets and logs
+logs/log/*
+*.pyc
