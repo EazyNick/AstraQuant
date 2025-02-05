@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import numpy as np
 
 class PPOAgent:
     def __init__(self, model, lr=0.0003, gamma=0.99, epsilon=0.2):
@@ -18,7 +19,7 @@ class PPOAgent:
 
     def update(self, memory):
         states, actions, rewards = zip(*memory)
-        states = torch.tensor(states, dtype=torch.float32)
+        states = torch.tensor(np.array(states), dtype=torch.float32)
         actions = torch.tensor(actions, dtype=torch.int64)
         rewards = torch.tensor(rewards, dtype=torch.float32)
 
