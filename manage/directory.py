@@ -4,7 +4,6 @@ import os
 """  
 import os
 import sys
-import time
 
 current_file = os.path.abspath(__file__) 
 project_root = os.path.abspath(os.path.join(current_file, "..", "..")) # 현재 디렉토리에 따라 이 부분 수정
@@ -39,6 +38,7 @@ class PathManager:
 
         # 주요 폴더 경로 설정
         self.folders = { 
+            "config": os.path.join(self.project_root, "config"),
             "git": os.path.join(self.project_root, "git"),
             "logs": os.path.join(self.project_root, "logs"),
             "manage": os.path.join(self.project_root, "manage"),

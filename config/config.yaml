@@ -1,0 +1,23 @@
+# config.yaml
+
+general:
+  seed: 42                # 랜덤 시드 값
+  device: "cuda"          # 학습 장치 (cuda / cpu)
+
+env:
+  initial_balance: 10000  # 초기 잔액
+  observation_window: 30  # 한 번에 입력하는 시계열 길이
+
+training:
+  episodes: 1          # 학습 에피소드 수
+  batch_size: 32          # 배치 크기
+  learning_rate: 0.0003   # 학습률
+  gamma: 0.99             # 할인율 (future reward 반영 비율)
+  epsilon: 0.2            # PPO 클리핑 파라미터
+  num_workers: 4          # 병렬 환경 개수 (멀티 프로세싱 사용 시)
+
+model:
+  input_dim: 87           # 입력 피처 개수 (자동 설정 가능)
+  model_dim: 64           # Transformer 모델 차원
+  num_heads: 2            # Transformer Multi-Head Attention 개수
+  num_layers: 2           # Transformer 레이어 개수
