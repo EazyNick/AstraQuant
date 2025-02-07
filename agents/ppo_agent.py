@@ -39,8 +39,8 @@ class PPOAgent:
 
     def select_action(self, state):
         state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(self.device)  # (1, seq_len, feature_dim)
-        probs = torch.softmax(self.model(state), dim=-1)
-        action = torch.multinomial(probs, 1).item()
+        probs = torch.softmax(self.model(state), dim=-1) # 현재 상태(state)를 StockTransformer 모델에 입력, probs = 확률 분포 πθ(a|s)
+        action = torch.multinomial(probs, 1).item() # 확률 기반 액션 샘플링
         return action
 
     def update(self, memory):
@@ -49,10 +49,10 @@ class PPOAgent:
         actions = torch.tensor(actions, dtype=torch.int64).to(self.device)
         rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
 
-        discounted_rewards = []
+        discounted_rewards = [] # Advantage Estimation
         sum_reward = 0
         for r in reversed(rewards):
-            sum_reward = r + self.gamma * sum_reward
+            sum_reward = r + self.gamma * sum_reward # gamma(γ) 값(할인율)을 사용하여 미래 보상을 현재 가치로 변환
             discounted_rewards.insert(0, sum_reward)
         discounted_rewards = torch.tensor(discounted_rewards, dtype=torch.float32).to(self.device)
 
@@ -61,17 +61,21 @@ class PPOAgent:
             batch_actions = actions[i:i+self.batch_size]
             batch_rewards = discounted_rewards[i:i+self.batch_size]
 
+            # 새로운 정책(`π_new`)의 확률 계산
             probs = torch.softmax(self.model(batch_states), dim=-1)
             action_probs = probs.gather(1, batch_actions.unsqueeze(1)).squeeze()
-            old_probs = action_probs.detach()
+            # detach()는 PyTorch 텐서의 연산 그래프(autograd)에서 분리하여, 역전파(gradient 계산)에 포함되지 않도록 하는 함수
+            old_probs = action_probs.detach() # 이전 정책(`π_old`) 확률 저장
 
-            ratio = action_probs / old_probs
-            clipped_ratio = torch.clamp(ratio, 1 - self.epsilon, 1 + self.epsilon)
-            loss = -torch.min(ratio * batch_rewards, clipped_ratio * batch_rewards).mean()
+            # PPO Clipped Objective 계산
+            ratio = action_probs / old_probs # 확률 비율(`π_new / π_old`) 계산
+            clipped_ratio = torch.clamp(ratio, 1 - self.epsilon, 1 + self.epsilon) # 확률 비율이 너무 커지지 않도록 클리핑(ε=0.2) 적용
+            loss = -torch.min(ratio * batch_rewards, clipped_ratio * batch_rewards).mean() # 손실 함수
 
+            # 모델 업데이트
             self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
+            loss.backward() # PPO 손실을 역전파(Backpropagation)하여 모델의 가중치 업데이트
+            self.optimizer.step() # Adam Optimizer를 사용하여 가중치 조정
 
 if __name__ == "__main__":
     from models.transformer_model import StockTransformer  # 모델 임포트
