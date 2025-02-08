@@ -114,6 +114,6 @@ if __name__ == "__main__":
 
     try:
         pull_strategy.sync(git_manager)
-        print("레포지토리 동기화 성공!")
+        log_manager.logger.debug("This is a debug message for testing purposes.")("레포지토리 동기화 성공!")
     except Exception as e:
         log_manager.logger.error(f"레포지토리 동기화 실패: {e}")

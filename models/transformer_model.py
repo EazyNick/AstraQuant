@@ -46,18 +46,18 @@ class StockTransformer(nn.Module):
         self.fc = nn.Linear(model_dim, 3).to(self.device)
 
     def forward(self, x):
-        print(f"입력 데이터 초기 shape: {x.shape}")
+        # log_manager.logger.debug(f"입력 데이터 초기 shape: {x.shape}")
         # x의 차원이 (batch, seq_len)이면, 마지막 차원을 추가해 (batch, seq_len, input_dim)으로 변환
         if x.dim() == 2:  # (seq_len, feature_dim) → batch 차원 없음
             x = x.unsqueeze(0)  # (1, seq_len, feature_dim)
-            print(f"batch 차원 추가 후 shape: {x.shape}")
+            log_manager.logger.debug(f"batch 차원 추가 후 shape: {x.shape}")
 
         x = x.to(self.device)  # 입력 데이터 GPU 이동
         x = self.embedding(x)  # (batch, seq_len, input_dim) -> (batch, seq_len, model_dim)
         x = self.transformer(x)  # Transformer 인코더를 통과
 
         output = self.fc(x[:, -1, :])  # 마지막 타임스텝의 출력을 사용하여 매매 신호 예측
-        print(f"최종 출력 shape: {output.shape}")  # ✅ 최종 출력 shape 확인
+        # log_manager.logger.debug(f"최종 출력 shape: {output.shape}")  # ✅ 최종 출력 shape 확인
 
         return output
 
@@ -66,5 +66,5 @@ if __name__ == "__main__":
     model = StockTransformer()
     test_input = torch.randn(30, config_manager.get_input_dim())  # (batch, seq_len, feature_dim)
     output = model(test_input)  # Transformer 모델을 거친 후 결과 반환
-    print("✅ 모델 출력 크기:", output.shape)  # ✅ (16, 3) → (batch_size, action_classes), 각 값은 Buy, Hold, Sell 확률을 의미
-    # print("✅ output:", output)
+    log_manager.logger.debug(f"✅ 모델 출력 크기:, output.shape")  # ✅ (16, 3) → (batch_size, action_classes), 각 값은 Buy, Hold, Sell 확률을 의미
+    # log_manager.logger.debug("✅ output:", output)

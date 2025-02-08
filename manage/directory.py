@@ -24,7 +24,7 @@ try:
     from module import ProcessStep
     from display import screenhandler
 except Exception as e:
-    print(f"임포트 실패: {e}")
+    log_manager.logger.debug("This is a debug message for testing purposes.")(f"임포트 실패: {e}")
 """
 
 
@@ -38,10 +38,16 @@ class PathManager:
 
         # 주요 폴더 경로 설정
         self.folders = { 
+            "agents": os.path.join(self.project_root, "agents"),
             "config": os.path.join(self.project_root, "config"),
+            "data": os.path.join(self.project_root, "data"),
+            "env": os.path.join(self.project_root, "env"),
             "git": os.path.join(self.project_root, "git"),
             "logs": os.path.join(self.project_root, "logs"),
             "manage": os.path.join(self.project_root, "manage"),
+            "models": os.path.join(self.project_root, "models"),
+            "output": os.path.join(self.project_root, "output"),
+            "training": os.path.join(self.project_root, "training"),
         }
 
     def get_path(self, folder_name):

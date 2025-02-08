@@ -1,6 +1,22 @@
 import yaml
 import torch
 import os
+import sys
+
+current_file = os.path.abspath(__file__) 
+project_root = os.path.abspath(os.path.join(current_file, "..", "..")) # 현재 디렉토리에 따라 이 부분 수정
+sys.path.append(project_root)
+
+from manage import PathManager
+path_manager = PathManager()
+
+# 원하는 경로 추가
+sys.path.append(path_manager.get_path("logs"))
+
+try:
+    from logs import log_manager
+except Exception as e:
+    print(f"임포트 실패: {e}")
 
 class ConfigManager:
     """ config.yaml을 관리하는 Singleton 클래스 (Getter & Setter 포함) """
@@ -36,7 +52,7 @@ class ConfigManager:
         requested_device = self.config["general"].get("device", "cuda")  # 기본값은 "cuda"
         
         if requested_device == "cuda" and not torch.cuda.is_available():
-            print("⚠️ CUDA GPU를 찾을 수 없습니다. CPU로 변경합니다.")
+            log_manager.logger.debug("⚠️ CUDA GPU를 찾을 수 없습니다. CPU로 변경합니다.")
             requested_device = "cpu"
         
         if requested_device not in ["cuda", "cpu"]:
@@ -62,6 +78,12 @@ class ConfigManager:
 
     def get_observation_window(self):
         return self.config["env"]["observation_window"]
+    
+    def get_epsilon(self):
+        return self.config["env"].get("epsilon", 0.1)  # ✅ 기본값 설정
+
+    def get_transaction_fee(self):
+        return self.config["env"].get("transaction_fee", 0.001)  # 기본값 설정
 
     ## =============================== ##
     ##        Training 설정 Getter     ##
@@ -141,20 +163,26 @@ class ConfigManager:
     def set_num_layers(self, value):
         self.config["model"]["num_layers"] = value
 
+    def set_transaction_fee(self, value):
+        self.config["env"]["transaction_fee"] = value
+
+    def set_epsilon(self, value):
+        self.config["env"]["epsilon"] = value
+
     def save_config(self):
         """ 변경된 설정을 config.yaml 파일에 저장 """
         with open(self.config_path, "w", encoding="utf-8") as file:
             yaml.dump(self.config, file, default_flow_style=False, allow_unicode=True)
-        print("✅ 설정이 config.yaml 파일에 저장되었습니다.")
+        log_manager.logger.debug("✅ 설정이 config.yaml 파일에 저장되었습니다.")
 
     def show_config(self):
         """ 현재 설정값 출력 """
-        print("🔹 현재 설정값:")
+        log_manager.logger.debug("🔹 현재 설정값:")
         for category, params in self.config.items():
-            print(f"[{category}]")
+            log_manager.logger.debug(f"[{category}]")
             for key, value in params.items():
-                print(f"  {key}: {value}")
-            print()
+                log_manager.logger.debug(f"  {key}: {value}")
+            log_manager.logger.debug("")
 
 # 예제 실행
 if __name__ == "__main__":
@@ -164,8 +192,8 @@ if __name__ == "__main__":
     config_manager.show_config()
 
     # 특정 설정 값 가져오기
-    print(f"🎯 학습 장치: {config_manager.get_device()}")
-    print(f"🎯 학습 에피소드 수: {config_manager.get_episodes()}")
+    log_manager.logger.debug(f"🎯 학습 장치: {config_manager.get_device()}")
+    log_manager.logger.debug(f"🎯 학습 에피소드 수: {config_manager.get_episodes()}")
 
     # 특정 설정 변경
     config_manager.set_episodes(10)
