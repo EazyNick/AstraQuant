@@ -48,10 +48,22 @@ class TrainingManager:
             os.makedirs(self.directory, exist_ok=True)  # 폴더가 없으면 자동 생성
             self.initialized = True
 
-    def save_model(self, model):
-        """ 학습된 모델을 저장하는 함수 """
-        torch.save(model.state_dict(), self.save_path)
-        log_manager.logger.debug(f"✅ 모델이 {self.save_path}에 저장되었습니다.")
+    def save_model(self, model, episode=None):
+        """
+        모델을 저장하는 함수
+
+        Args:
+            model (torch.nn.Module): 저장할 모델
+            episode (int, optional): 에피소드 번호를 포함하여 저장 (기본값: None)
+        """
+        if episode is not None:
+            filename = f"ppo_stock_trader_episode_{episode}.pth"  # ✅ 에피소드 번호 포함
+        else:
+            filename = self.filename
+
+        save_path = os.path.join(self.directory, filename)
+        torch.save(model.state_dict(), save_path)
+        log_manager.logger.info(f"✅ 모델 저장 완료: {save_path}")
 
 def train_agent(env, agent, episodes, training_manager):
     """ PPO 에이전트를 학습시키는 함수 """
@@ -73,12 +85,13 @@ def train_agent(env, agent, episodes, training_manager):
                 agent.update(memory)  # PPO 업데이트 수행
                 memory = []  # 배치 학습 후 메모리 초기화
 
-        log_manager.logger.info(f"Episode {episode+1}/{episodes}, Total Reward: {total_reward}")
+        final_portfolio_value = env.balance + (env.shares_held * env.stock_data[env.current_step, 0])
+        log_manager.logger.info(f"Episode {episode+1}/{episodes}, Total Reward: {total_reward}, final_portfolio_value: {final_portfolio_value:.2f}")
 
-        # ✅ 매 10번째 에피소드마다 모델 저장
-        if (episode + 1) % 10 == 0:
-            training_manager.save_model(agent.model)
-            log_manager.logger.info(f"✅ 모델 저장 완료: {training_manager.save_path}")
+        # ✅ 매 100번째 에피소드마다 모델 저장
+        if (episode + 1) % 100 == 0:
+            training_manager.save_model(agent.model, episode=(episode + 1))
+            log_manager.logger.info(f"✅ 모델 저장 완료 (Episode {episode+1}): {training_manager.save_path}")
 
     # ✅ 최종 학습 완료 후 모델 저장
     training_manager.save_model(agent.model)
