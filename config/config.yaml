@@ -11,7 +11,7 @@ env:
   transaction_fee: 0.001    # 거래 수수료 (0.1% = 0.001)
 
 training:
-  episodes: 128       # 학습 에피소드 수
+  episodes: 1000       # 학습 에피소드 수
   batch_size: 12          # 배치 크기
   learning_rate: 0.0003   # 학습률
   gamma: 0.99             # 할인율 (future reward 반영 비율)

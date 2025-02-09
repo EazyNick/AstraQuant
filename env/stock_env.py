@@ -86,11 +86,11 @@ class StockTradingEnv(gym.Env):
         else:
             percent_change = 0
 
-        reward = (percent_change * 100) * 1000    # ✅ 변화율 기반 보상 (1000배 증가)
+        reward = (percent_change * 100) * 100    # ✅ 변화율 기반 보상 (1000배 증가)
 
         # 보유 주식 가격 상승 시 추가 보상
         if self.current_step > 0:
-            reward += (price - self.stock_data[self.current_step - 1, 0]) * self.shares_held * 0.5 # 변동 보상 50% 감소
+            reward += (price - self.stock_data[self.current_step - 1, 0]) * self.shares_held * 1 # 변동 보상 50% 감소
 
         self.previous_portfolio_value = new_portfolio_value  
 
