@@ -109,13 +109,10 @@ class StockTradingEnv(gym.Env):
             holding_reward = 0
 
         # 1달(30일) 후의 `Buy & Hold` 수익률 계산
-        future_reward = 0
-        future_step = self.current_step + 30
-
-        if future_step < len(self.stock_data):
-            future_price = self.stock_data[future_step, 0]  # 30일 후의 주가
-            future_return = ((future_price - price) / price) * 100  # 1달 후의 `Buy & Hold` 수익률
-            future_reward = future_return * 500  # ✅ `Buy & Hold` 전략보다 수익률이 높으면 추가 보상
+        future_step = min(self.current_step + 30, len(self.stock_data) - 1)
+        future_price = self.stock_data[future_step, 0]  # 가장 먼 미래의 데이터를 가져옴
+        future_return = ((future_price - price) / price) * 100  # `Buy & Hold` 수익률 계산
+        future_reward = future_return * 500  # 수익률 기반 보상
 
         # ✅ 최종 보상 (각 보상 요소를 합산)
         reward = short_term_reward + long_term_reward + holding_reward + future_reward

@@ -111,8 +111,10 @@ def train_agent(env, agent, episodes, training_manager):
     """ PPO 에이전트를 학습시키는 함수 """
     log_manager.logger.info(f"🎯 학습 시작")
 
-    # ✅ 체크포인트 로드 (이전 학습 기록이 있으면 이어서 시작)
+    # 체크포인트 로드 (이전 학습 기록이 있으면 이어서 시작)
     start_episode = training_manager.load_checkpoint(agent.model, agent.optimizer)
+    best_reward = float('-inf')  # 최고 리워드 기록 초기화
+    saveflag = False
 
     for episode in range(start_episode, episodes):
         state = env.reset()
@@ -133,13 +135,21 @@ def train_agent(env, agent, episodes, training_manager):
         final_portfolio_value = env.balance + (env.shares_held * env.stock_data[env.current_step, 0])
         log_manager.logger.info(f"Episode {episode+1}/{episodes}, Total Reward: {total_reward}, final_portfolio_value: {final_portfolio_value:.2f}")
 
-        # ✅ 매 100번째 에피소드마다 모델과 체크포인트 저장
-        if (episode + 1) % 10 == 0:
+        # 매 100번째 에피소드마다 모델과 체크포인트 저장
+        if (episode + 1) % 100 == 0:
             training_manager.save_model(agent.model, episode=(episode + 1))
-            training_manager.save_checkpoint(agent.model, agent.optimizer, episode+1)  # ✅ 체크포인트 저장
+            training_manager.save_checkpoint(agent.model, agent.optimizer, episode+1)  # 체크포인트 저장
+            saveflag = True
             log_manager.logger.info(f"✅ 체크포인트 및 모델 저장 완료 (Episode {episode+1})")
 
-    # ✅ 최종 학습 완료 후 모델 저장
+         # 현재 에피소드의 보상이 최고 보상(best_reward)보다 높을 경우 저장
+        if saveflag == False and total_reward > best_reward:
+            best_reward = total_reward  # 최고 리워드 갱신
+            training_manager.save_model(agent.model, episode=(episode + 1))
+            training_manager.save_checkpoint(agent.model, agent.optimizer, episode + 1)  # 체크포인트 저장
+            log_manager.logger.info(f"✅ 최고 리워드 갱신! 모델 저장 완료 (Episode {episode+1})")
+
+    # 최종 학습 완료 후 모델 저장
     training_manager.save_model(agent.model)
     log_manager.logger.info(f"✅ 최종 모델 저장 완료: {training_manager.save_path}")
 
