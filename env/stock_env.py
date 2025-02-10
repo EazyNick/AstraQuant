@@ -111,8 +111,21 @@ class StockTradingEnv(gym.Env):
 
         # 1달(30일) 후의 `Buy & Hold` 수익률 계산
         future_step = min(self.current_step + 30, len(self.stock_data) - 1)
-        future_price = self.stock_data[future_step, 0]  # 가장 먼 미래의 데이터를 가져옴
-        future_return = ((future_price - price) / price) * 100  # `Buy & Hold` 수익률 계산
+        # 현재 스텝을 제외한 30일 이내의 최고가 & 최저가 찾기
+        future_max_price = np.max(self.stock_data[self.current_step + 1:future_step + 1, 0])
+        future_min_price = np.min(self.stock_data[self.current_step + 1:future_step + 1, 0])
+        
+        # 리워드 계산
+        if action == 2:  # 매수(Buy)
+            future_return = ((future_max_price - price) / price) * 100
+        elif action == 0:  # 매도(Sell)
+            future_return = ((price - future_min_price) / price) * 100
+        elif action == 1:  # 관망(Hold)
+            if self.shares_held:  # 주식을 보유 중이라면
+                future_return = ((future_max_price - price) / price) * 100 # 30일 내 최고가 대비 수익률
+            else:  # 주식을 보유하지 않은 상태라면
+                future_return = ((price - future_min_price) / price) * 100  # 30일 내 최저가 대비 수익률
+        
         future_reward = future_return * 500  # 수익률 기반 보상
 
         # ✅ 최종 보상 (각 보상 요소를 합산)

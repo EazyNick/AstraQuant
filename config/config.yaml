@@ -1,7 +1,7 @@
 # config.yaml
 
 general:
-  seed: 42                # 랜덤 시드 값
+  seed: 77777                # 랜덤 시드 값
   device: "cuda"          # 학습 장치 (cuda / cpu)
 
 env:

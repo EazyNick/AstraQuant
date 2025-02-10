@@ -5,6 +5,12 @@ from models.transformer_model import StockTransformer
 from data.data_loader import load_stock_data
 from config import config_manager 
 
+try:
+    from logs import log_manager
+    from config import config_manager
+except Exception as e:
+    print(f"임포트 실패: {e}")
+
 # 저장된 모델 불러오기
 def load_model(model_path, input_dim, device="cpu"):
     model = StockTransformer(input_dim=input_dim).to(device)
@@ -44,13 +50,16 @@ if __name__ == "__main__":
     if stock_data.shape[0] < observation_window:
         raise ValueError(f"❌ 테스트 데이터가 너무 적습니다! (필요: {observation_window}, 제공됨: {stock_data.shape[0]})")
 
-    last_state = stock_data[-observation_window:]  # ✅ 마지막 observation_window 가져오기
-    last_date = dates[-1]  # ✅ 해당 데이터의 마지막 날짜 가져오기
-
-    # ✅ 모델을 사용하여 액션 예측
-    action, probs = predict_action(model, last_state, device)
-
-    # ✅ 액션 출력
+    # ✅ 전체 데이터에 대한 예측 수행
     action_dict = {0: "매도(Sell)", 1: "관망(Hold)", 2: "매수(Buy)"}
-    print(f"\n📌 예측 날짜: {last_date}")
-    print(f"📌 예측된 매매 결정: {action_dict[action]} (확률: {probs[0]})")
+    predictions = []
+
+    for i in range(observation_window, stock_data.shape[0]):
+        state = stock_data[i - observation_window:i]  # 관찰 윈도우 데이터 추출
+        date = dates[i]  # 해당 날짜 가져오기
+        action, probs = predict_action(model, state, device)
+        predictions.append([date, action_dict[action], probs[0]])
+
+    # ✅ 데이터프레임으로 변환 및 출력
+    result_df = pd.DataFrame(predictions, columns=["날짜", "예측 매매 결정", "확률(%)"])
+    print(result_df)

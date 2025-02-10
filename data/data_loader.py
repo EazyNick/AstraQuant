@@ -1,6 +1,7 @@
 # 데이터 로더 모듈 - 주식 데이터 불러오기
 
 import pandas as pd
+import numpy as np
 
 def load_stock_data(file_path):
     """
@@ -19,10 +20,18 @@ def load_stock_data(file_path):
     df.fillna(0, inplace=True)
 
     # ✅ Boolean 값을 0과 1로 변환
-    df = df.replace({True: 1.0, False: 0.0}).astype(float)
+    # True/False 변환 후, 숫자형 데이터만 float으로 변환
+    df = df.replace({True: 1.0, False: 0.0})
+    df[df.select_dtypes(include=[np.number]).columns] = df.select_dtypes(include=[np.number]).astype(float)
 
     # ✅ 거래량(VMA_* 포함) 컬럼 제거
     selected_columns = [col for col in df.columns if "Volume" not in col and "VMA" not in col]
+
+    # Slope_VMA 는 포함
+    # selected_columns = [
+    # col for col in df.columns 
+    # if "Volume" not in col and ("VMA_" not in col or "Slope_VMA" in col)
+    # ]
 
     # ✅ 날짜(Date) 컬럼 제외하고 numpy 배열로 변환
     data = df[selected_columns].drop(columns=['Date'], errors='ignore').values
