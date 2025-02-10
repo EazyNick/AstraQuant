@@ -19,7 +19,7 @@ def load_stock_data(file_path):
     df.fillna(0, inplace=True)
 
     # ✅ Boolean 값을 0과 1로 변환
-    df = df.replace({True: 1.0, False: 0.0})
+    df = df.replace({True: 1.0, False: 0.0}).astype(float)
 
     # ✅ 거래량(VMA_* 포함) 컬럼 제거
     selected_columns = [col for col in df.columns if "Volume" not in col and "VMA" not in col]

@@ -20,6 +20,6 @@ training:
 
 model:
   input_dim: 1           # 입력 피처 개수 (자동 설정 가능)
-  model_dim: 4048           # Transformer 모델 차원
+  model_dim: 1024           # Transformer 모델 차원
   num_heads: 4            # Transformer Multi-Head Attention 개수, 각 칼럼에 가중치를 다르게 두고 학습
   num_layers: 4           # Transformer 레이어 개수
