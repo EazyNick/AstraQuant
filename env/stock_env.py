@@ -41,6 +41,7 @@ class StockTradingEnv(gym.Env):
         self.balance = self.initial_balance
         self.shares_held = 0 # 보유 주식 수
         self.previous_portfolio_value = self.initial_balance 
+        self.epsilon_min = 0.01
         
         
         self.action_space = spaces.Discrete(3)  # 0: 매도, 1: 보유, 2: 매수

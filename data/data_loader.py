@@ -15,6 +15,12 @@ def load_stock_data(file_path):
     # ✅ CSV 파일 로드
     df = pd.read_csv(file_path)
 
+    # ✅ NaN 값 처리
+    df.fillna(0, inplace=True)
+
+    # ✅ Boolean 값을 0과 1로 변환
+    df = df.replace({True: 1.0, False: 0.0})
+
     # ✅ 거래량(VMA_* 포함) 컬럼 제거
     selected_columns = [col for col in df.columns if "Volume" not in col and "VMA" not in col]
 
