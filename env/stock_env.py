@@ -4,6 +4,7 @@ import numpy as np
 import gym
 from gym import spaces
 import random
+import torch
 
 import os
 import sys
@@ -29,6 +30,7 @@ except Exception as e:
 class StockTradingEnv(gym.Env):
     def __init__(self, stock_data):
         super(StockTradingEnv, self).__init__()
+        self.device = config_manager.get_device()
         self.initial_balance = config_manager.get_initial_balance()
         self.observation_window = config_manager.get_observation_window()
         self.transaction_fee = config_manager.get_transaction_fee() 
@@ -39,10 +41,15 @@ class StockTradingEnv(gym.Env):
         self.balance = self.initial_balance
         self.shares_held = 0 # 보유 주식 수
         self.previous_portfolio_value = self.initial_balance 
+        self.epsilon_min = 0.01
         
         
         self.action_space = spaces.Discrete(3)  # 0: 매도, 1: 보유, 2: 매수
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.observation_window, self.feature_dim), dtype=np.float32)
+
+    def normalize_reward(self, value, scale=50000): # -1,000 ~ 1,000
+        value = torch.tensor(value, dtype=torch.float32).to(self.device)  # Tensor 변환 후 GPU/CPU 이동
+        return torch.tanh(value / scale) * scale  # 정규화 적용
 
     def reset(self):
         """ 환경을 초기화하고 초기 상태를 반환 """
@@ -59,6 +66,7 @@ class StockTradingEnv(gym.Env):
         # 입실론(ε) 값을 이용한 랜덤 액션 (탐색)
         if random.uniform(0, 1) < self.epsilon:
             action = random.choice([0, 1, 2])  # 0: 매도, 1: 보유, 2: 매수
+            self.epsilon = max(self.epsilon * 0.999, self.epsilon_min)  # 0.999 → 지수적 감소
 
         if action == 2:  # 매수 (Buy)
             shares_to_buy = self.balance / (price * (1 + self.transaction_fee)) # 살 수 있는 최대 주식 수
@@ -80,17 +88,51 @@ class StockTradingEnv(gym.Env):
         # 새로운 포트폴리오 가치 계산
         new_portfolio_value = self.balance + (self.shares_held * price)
 
-        # 포트폴리오 가치 변화율을 보상으로 설정
-        if self.previous_portfolio_value > 0:
-            percent_change = (new_portfolio_value - self.previous_portfolio_value) / self.previous_portfolio_value
-        else:
-            percent_change = 0
+        short_term_reward = 0
+        long_term_reward = 0
+        holding_reward = 0
+        future_reward = 0
+        reward = 0
 
-        reward = (percent_change * 100) * 1000    # ✅ 변화율 기반 보상 (1000배 증가)
+        # 포트폴리오 가치 변화율을 보상으로 설정 (수익률 기반 보상), 단기 수익률 보상
+        if self.previous_portfolio_value > 0:
+            short_term_reward = ((new_portfolio_value - self.previous_portfolio_value) / self.previous_portfolio_value) * 100 * 50
+        else:
+            short_term_reward = 0
+
+        # 장기적 보상을 반영하도록 강화 (현재 가치 대비 초기 가치)
+        long_term_reward = ((new_portfolio_value - self.initial_balance) / self.initial_balance) * 100 * 50
 
         # 보유 주식 가격 상승 시 추가 보상
-        if self.current_step > 0:
-            reward += (price - self.stock_data[self.current_step - 1, 0]) * self.shares_held * 0.5 # 변동 보상 50% 감소
+        if self.shares_held > 0 and self.current_step > 0:
+            holding_reward = (price - self.stock_data[self.current_step - 1, 0]) * self.shares_held * 2
+        else:
+            holding_reward = 0
+
+        # 1달(30일) 후의 `Buy & Hold` 수익률 계산
+        future_step = min(self.current_step + 30, len(self.stock_data) - 1)
+        # 현재 스텝을 제외한 30일 이내의 최고가 & 최저가 찾기
+        future_max_price = np.max(self.stock_data[self.current_step + 1:future_step + 1, 0])
+        future_min_price = np.min(self.stock_data[self.current_step + 1:future_step + 1, 0])
+        
+        # 리워드 계산
+        if action == 2:  # 매수(Buy)
+            future_return = ((future_max_price - price) / price) * 100
+        elif action == 0:  # 매도(Sell)
+            future_return = ((price - future_min_price) / price) * 100
+        elif action == 1:  # 관망(Hold)
+            if self.shares_held:  # 주식을 보유 중이라면
+                future_return = ((future_max_price - price) / price) * 100 # 30일 내 최고가 대비 수익률
+            else:  # 주식을 보유하지 않은 상태라면
+                future_return = ((price - future_min_price) / price) * 100  # 30일 내 최저가 대비 수익률
+        
+        future_reward = future_return * 500  # 수익률 기반 보상
+
+        # ✅ 최종 보상 (각 보상 요소를 합산)
+        reward = short_term_reward + long_term_reward + holding_reward + future_reward
+
+        # ✅ 보상 정규화 적용
+        reward = self.normalize_reward(reward)
 
         self.previous_portfolio_value = new_portfolio_value  
 

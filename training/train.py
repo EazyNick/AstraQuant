@@ -30,34 +30,93 @@ except Exception as e:
 
 class TrainingManager:
     """ 학습된 모델을 저장 및 관리하는 클래스 """
-    def __init__(self, directory=None, filename="ppo_stock_trader.pth"):
+    def __init__(self, directory=None, filename="ppo_stock_trader.pth", checkpoint_filename="ppo_checkpoint.pth"):
         """
         TrainingManager 초기화
 
         Args:
             directory (str, optional): 모델 저장 디렉토리. 기본값은 프로젝트 루트 디렉토리에서 `output` 폴더.
             filename (str): 저장할 모델 파일 이름.
+            checkpoint_filename (str): 체크포인트 파일 이름.
         """
         if not hasattr(self, 'initialized'):  # ✅ 인스턴스가 초기화되었는지 확인
             default_directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "output")
             self.directory = directory or default_directory  # ✅ 사용자가 지정한 경로가 없으면 기본값 사용
             self.filename = filename
+            self.checkpoint_filename = checkpoint_filename
             self.save_path = os.path.join(self.directory, self.filename)
+            self.checkpoint_path = os.path.join(self.directory, self.checkpoint_filename)
             log_manager.logger.debug(f"✅ 모델 저장 경로: {self.save_path}")
 
             os.makedirs(self.directory, exist_ok=True)  # 폴더가 없으면 자동 생성
             self.initialized = True
 
-    def save_model(self, model):
-        """ 학습된 모델을 저장하는 함수 """
-        torch.save(model.state_dict(), self.save_path)
-        log_manager.logger.debug(f"✅ 모델이 {self.save_path}에 저장되었습니다.")
+    def save_model(self, model, episode=None):
+        """
+        모델을 저장하는 함수
+
+        Args:
+            model (torch.nn.Module): 저장할 모델
+            episode (int, optional): 에피소드 번호를 포함하여 저장 (기본값: None)
+        """
+        if episode is not None:
+            filename = f"ppo_stock_trader_episode_{episode}.pth"  # ✅ 에피소드 번호 포함
+        else:
+            filename = self.filename
+
+        save_path = os.path.join(self.directory, filename)
+        torch.save(model.state_dict(), save_path)
+        log_manager.logger.info(f"✅ 모델 저장 완료: {save_path}")
+
+    def save_checkpoint(self, model, optimizer, episode):
+        """
+        체크포인트를 저장하는 함수 (모델 + 옵티마이저 + 현재 진행된 에피소드 포함)
+
+        Args:
+            model (torch.nn.Module): 저장할 모델
+            optimizer (torch.optim.Optimizer): 옵티마이저 상태
+            episode (int): 현재 학습 진행된 에피소드
+        """
+        checkpoint = {
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'episode': episode
+        }
+        torch.save(checkpoint, self.checkpoint_path)
+        log_manager.logger.info(f"✅ 체크포인트 저장 완료: {self.checkpoint_path} (Episode {episode})")
+
+    def load_checkpoint(self, model, optimizer):
+        """
+        체크포인트를 로드하는 함수
+
+        Args:
+            model (torch.nn.Module): 불러올 모델
+            optimizer (torch.optim.Optimizer): 불러올 옵티마이저 상태
+
+        Returns:
+            int: 마지막 학습된 에피소드 번호 (없으면 0 반환)
+        """
+        if os.path.exists(self.checkpoint_path):
+            checkpoint = torch.load(self.checkpoint_path)
+            model.load_state_dict(checkpoint['model_state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            episode = checkpoint['episode']
+            log_manager.logger.info(f"✅ 체크포인트 로드 완료: {self.checkpoint_path} (Episode {episode})")
+            return episode
+        else:
+            log_manager.logger.info("⚠️ 체크포인트가 존재하지 않습니다. 새로운 학습을 시작합니다.")
+            return 0
 
 def train_agent(env, agent, episodes, training_manager):
     """ PPO 에이전트를 학습시키는 함수 """
-    log_manager.logger.info(f"학습 Start")
+    log_manager.logger.info(f"🎯 학습 시작")
 
-    for episode in range(episodes):
+    # 체크포인트 로드 (이전 학습 기록이 있으면 이어서 시작)
+    start_episode = training_manager.load_checkpoint(agent.model, agent.optimizer)
+    best_reward = float('-inf')  # 최고 리워드 기록 초기화
+    saveflag = False
+
+    for episode in range(start_episode, episodes):
         state = env.reset()
         memory = []
         total_reward = 0
@@ -73,14 +132,24 @@ def train_agent(env, agent, episodes, training_manager):
                 agent.update(memory)  # PPO 업데이트 수행
                 memory = []  # 배치 학습 후 메모리 초기화
 
-        log_manager.logger.info(f"Episode {episode+1}/{episodes}, Total Reward: {total_reward}")
+        final_portfolio_value = env.balance + (env.shares_held * env.stock_data[env.current_step, 0])
+        log_manager.logger.info(f"Episode {episode+1}/{episodes}, Total Reward: {total_reward}, final_portfolio_value: {final_portfolio_value:.2f}")
 
-        # ✅ 매 10번째 에피소드마다 모델 저장
-        if (episode + 1) % 10 == 0:
-            training_manager.save_model(agent.model)
-            log_manager.logger.info(f"✅ 모델 저장 완료: {training_manager.save_path}")
+        # 매 100번째 에피소드마다 모델과 체크포인트 저장
+        if (episode + 1) % 100 == 0:
+            training_manager.save_model(agent.model, episode=(episode + 1))
+            training_manager.save_checkpoint(agent.model, agent.optimizer, episode+1)  # 체크포인트 저장
+            saveflag = True
+            log_manager.logger.info(f"✅ 체크포인트 및 모델 저장 완료 (Episode {episode+1})")
 
-    # ✅ 최종 학습 완료 후 모델 저장
+         # 현재 에피소드의 보상이 최고 보상(best_reward)보다 높을 경우 저장
+        if saveflag == False and total_reward > best_reward:
+            best_reward = total_reward  # 최고 리워드 갱신
+            training_manager.save_model(agent.model, episode=(episode + 1))
+            training_manager.save_checkpoint(agent.model, agent.optimizer, episode + 1)  # 체크포인트 저장
+            log_manager.logger.info(f"✅ 최고 리워드 갱신! 모델 저장 완료 (Episode {episode+1})")
+
+    # 최종 학습 완료 후 모델 저장
     training_manager.save_model(agent.model)
     log_manager.logger.info(f"✅ 최종 모델 저장 완료: {training_manager.save_path}")
 
