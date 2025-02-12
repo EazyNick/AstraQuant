@@ -24,6 +24,14 @@ def load_stock_data(file_path):
     df = df.replace({True: 1.0, False: 0.0})
     df[df.select_dtypes(include=[np.number]).columns] = df.select_dtypes(include=[np.number]).astype(float)
 
+    # 경고 메시지 안뜨게 함
+    # # ✅ Boolean 값을 0과 1로 변환
+    # df = df.astype(object).replace({True: 1.0, False: 0.0})  # 명시적으로 object 변환 후 처리
+    # df = df.infer_objects(copy=False)  # 자동 형 변환 방식 지정 (FutureWarning 방지)
+
+    # # ✅ 숫자형 데이터 변환 (기존 방식 유지)
+    # df[df.select_dtypes(include=[np.number]).columns] = df.select_dtypes(include=[np.number])
+
     # ✅ 거래량(VMA_* 포함) 컬럼 제거
     selected_columns = [col for col in df.columns if "Volume" not in col and "VMA" not in col]
 
