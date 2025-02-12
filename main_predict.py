@@ -11,12 +11,42 @@ try:
 except Exception as e:
     print(f"임포트 실패: {e}")
 
-# 저장된 모델 불러오기
-def load_model(model_path, input_dim, device="cpu"):
-    model = StockTransformer(input_dim=input_dim).to(device)
-    model.load_state_dict(torch.load(model_path, map_location=device))
-    model.eval()  # 평가 모드 설정
-    return model
+# ✅ 저장된 모델 가중치를 불러오는 함수
+def load_model(model_path, model_class, input_dim, device="cpu"):
+    """
+    저장된 모델 가중치를 불러오는 함수
+
+    Args:
+        model_path (str): 모델 가중치 파일 경로
+        model_class (torch.nn.Module): 모델 클래스 (StockTransformer 등)
+        input_dim (int): 모델 입력 차원
+        device (str, optional): 사용할 디바이스. 기본값: "cpu"
+
+    Returns:
+        model (torch.nn.Module): 불러온 모델 (None 반환 시 로드 실패)
+    """
+    if not os.path.exists(model_path):
+        print(f"❌ 모델 파일이 존재하지 않습니다: {model_path}")
+        return None
+
+    try:
+        # ✅ 새로운 모델 객체를 먼저 생성한 후, 가중치를 불러옴
+        model = model_class(input_dim=input_dim).to(device)
+
+        # ✅ 가중치 로드 (PyTorch 2.6 이후 버전 대응)
+        state_dict = torch.load(model_path, map_location=device)
+
+        # ✅ 가중치 적용 (strict=False: 모델 구조가 일부 다를 경우 대비)
+        model.load_state_dict(state_dict, strict=False)
+
+        # ✅ 모델 평가 모드 설정
+        model.eval()
+        print(f"✅ 모델 로드 완료: {model_path}")
+
+        return model
+    except Exception as e:
+        print(f"❌ 모델 로드 실패: {e}")
+        return None
 
 # 확률 값 변환 함수 (0~100% 범위로 변환 및 최소값 보장)
 def format_probs(probs):
@@ -37,9 +67,9 @@ if __name__ == "__main__":
     device = torch.device(config_manager.get_device())
 
     # ✅ 저장된 모델 로드
-    model_path = os.path.join(os.path.dirname(__file__), "output", "ppo_stock_trader_episode_230.pth")
+    model_path = os.path.join(os.path.dirname(__file__), "output", "ppo_stock_trader_episode_300.pth")
     stock_data, input_dim = load_stock_data("data/csv/sp500_test_data.csv")  # ✅ 테스트 데이터 로드
-    model = load_model(model_path, input_dim, device)
+    model = load_model(model_path, StockTransformer, input_dim, device)
 
     # ✅ 날짜 및 피처 데이터 분리
     df = pd.read_csv("data/csv/sp500_test_data.csv")
@@ -61,5 +91,7 @@ if __name__ == "__main__":
         predictions.append([date, action_dict[action], probs[0]])
 
     # ✅ 데이터프레임으로 변환 및 출력
+        # ✅ 모든 행을 출력하도록 설정 변경
+    pd.set_option("display.max_rows", None)
     result_df = pd.DataFrame(predictions, columns=["날짜", "예측 매매 결정", "확률(%)"])
-    print(result_df)
+    log_manager.logger.info(result_df)

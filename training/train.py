@@ -39,7 +39,7 @@ class TrainingManager:
             filename (str): 저장할 모델 파일 이름.
             checkpoint_filename (str): 체크포인트 파일 이름.
         """
-        if not hasattr(self, 'initialized'):  # ✅ 인스턴스가 초기화되었는지 확인
+        if not hasattr(self, 'initialized'):  # 인스턴스가 초기화되었는지 확인
             default_directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "output")
             self.directory = directory or default_directory  # ✅ 사용자가 지정한 경로가 없으면 기본값 사용
             self.filename = filename
@@ -53,7 +53,7 @@ class TrainingManager:
 
     def save_model(self, model, episode=None):
         """
-        모델을 저장하는 함수
+        모델 가중치를 저장하는 함수 (전체 모델이 아니라 가중치만 저장)
 
         Args:
             model (torch.nn.Module): 저장할 모델
@@ -65,8 +65,12 @@ class TrainingManager:
             filename = self.filename
 
         save_path = os.path.join(self.directory, filename)
-        torch.save(model.state_dict(), save_path)
-        log_manager.logger.info(f"✅ 모델 저장 완료: {save_path}")
+
+        try:
+            torch.save(model.state_dict(), save_path)  # 🔥 가중치만 저장
+            log_manager.logger.info(f"✅ 모델 저장 완료: {save_path}")
+        except Exception as e:
+            log_manager.logger.error(f"❌ 모델 저장 실패: {e}")
 
     def save_checkpoint(self, model, optimizer, episode):
         """
@@ -98,7 +102,7 @@ class TrainingManager:
         """
         if os.path.exists(self.checkpoint_path):
             checkpoint = torch.load(self.checkpoint_path)
-            model.load_state_dict(checkpoint['model_state_dict'])
+            model.load_state_dict(checkpoint['model_state_dict'], strict=False)
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             episode = checkpoint['episode']
             log_manager.logger.info(f"✅ 체크포인트 로드 완료: {self.checkpoint_path} (Episode {episode})")
@@ -133,7 +137,7 @@ def train_agent(env, agent, episodes, training_manager):
                 memory = []  # 배치 학습 후 메모리 초기화
 
         final_portfolio_value = env.balance + (env.shares_held * env.stock_data[env.current_step, 0])
-        log_manager.logger.info(f"Episode {episode+1}/{episodes}, Total Reward: {total_reward}, final_portfolio_value: {final_portfolio_value:.2f}")
+        log_manager.logger.debug(f"Episode {episode+1}/{episodes}, Total Reward: {total_reward}, final_portfolio_value: {final_portfolio_value:.2f}")
 
         # 매 100번째 에피소드마다 모델과 체크포인트 저장
         if (episode + 1) % 100 == 0:
