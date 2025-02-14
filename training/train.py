@@ -143,7 +143,6 @@ def train_agent(env, agent, episodes, training_manager):
         if (episode + 1) % 100 == 0:
             training_manager.save_model(agent.model, episode=(episode + 1))
             training_manager.save_checkpoint(agent.model, agent.optimizer, episode+1)  # 체크포인트 저장
-            saveflag = True
             log_manager.logger.info(f"✅ 체크포인트 및 모델 저장 완료 (Episode {episode+1})")
 
          # 현재 에피소드의 보상이 최고 보상(best_reward)보다 높을 경우 저장
