@@ -67,8 +67,9 @@ if __name__ == "__main__":
     device = torch.device(config_manager.get_device())
 
     # ✅ 저장된 모델 로드
-    model_path = os.path.join(os.path.dirname(__file__), "output", "ppo_stock_trader_episode_300.pth")
-    stock_data, input_dim = load_stock_data("data/csv/sp500_test_data.csv")  # ✅ 테스트 데이터 로드
+    model_path = os.path.join(os.path.dirname(__file__), "output", "ppo_stock_trader_episode_79.pth")
+    stock_data, input_dim = load_stock_data("data/csv/TSLA_test_data.csv")  # ✅ 테스트 데이터 로드
+    # stock_data, input_dim = load_stock_data("data/csv/sp500_test_data.csv")  # ✅ 테스트 데이터 로드
     model = load_model(model_path, StockTransformer, input_dim, device)
 
     # ✅ 날짜 및 피처 데이터 분리
@@ -91,7 +92,16 @@ if __name__ == "__main__":
         predictions.append([date, action_dict[action], probs[0]])
 
     # ✅ 데이터프레임으로 변환 및 출력
-        # ✅ 모든 행을 출력하도록 설정 변경
+    # ✅ 모든 행을 출력하도록 설정 변경
     pd.set_option("display.max_rows", None)
     result_df = pd.DataFrame(predictions, columns=["날짜", "예측 매매 결정", "확률(%)"])
     log_manager.logger.info(result_df)
+
+    # ✅ 각 매매 결정별 총 개수 계산 및 출력
+    action_counts = result_df["예측 매매 결정"].value_counts()
+    total_sell = action_counts.get("매도(Sell)", 0)
+    total_hold = action_counts.get("관망(Hold)", 0)
+    total_buy  = action_counts.get("매수(Buy)", 0)
+    
+    summary = f"총 매도: {total_sell}건, 총 관망: {total_hold}건, 총 매수: {total_buy}건"
+    log_manager.logger.info(summary)
