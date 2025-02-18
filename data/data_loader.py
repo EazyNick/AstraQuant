@@ -21,7 +21,7 @@ def load_stock_data(file_path):
 
     # ✅ Boolean 값을 0과 1로 변환
     # True/False 변환 후, 숫자형 데이터만 float으로 변환
-    df = df.replace({True: 1.0, False: 0.0})
+    df = df.replace({True: 1000.0, False: 0.0})
     df[df.select_dtypes(include=[np.number]).columns] = df.select_dtypes(include=[np.number]).astype(float)
 
     # 경고 메시지 안뜨게 함
@@ -35,11 +35,11 @@ def load_stock_data(file_path):
     # ✅ 거래량(VMA_* 포함) 컬럼 제거
     selected_columns = [col for col in df.columns if "Volume" not in col and "VMA" not in col]
 
-    # Slope_VMA 는 포함
-    # selected_columns = [
-    # col for col in df.columns 
-    # if "Volume" not in col and ("VMA_" not in col or "Slope_VMA" in col)
-    # ]
+    Slope_VMA 는 포함
+    selected_columns = [
+    col for col in df.columns 
+    if "Volume" not in col and ("VMA_" not in col or "Slope_VMA" in col)
+    ]
 
     # ✅ 날짜(Date) 컬럼 제외하고 numpy 배열로 변환
     data = df[selected_columns].drop(columns=['Date'], errors='ignore').values
