@@ -140,7 +140,7 @@ def train_agent(env, agent, episodes, training_manager):
         log_manager.logger.debug(f"Episode {episode+1}/{episodes}, Total Reward: {total_reward}, final_portfolio_value: {final_portfolio_value:.2f}")
 
         # 매 100번째 에피소드마다 모델과 체크포인트 저장
-        if (episode + 1) % 100 == 0:
+        if (episode + 1) % 50 == 0:
             training_manager.save_model(agent.model, episode=(episode + 1))
             training_manager.save_checkpoint(agent.model, agent.optimizer, episode+1)  # 체크포인트 저장
             log_manager.logger.info(f"✅ 체크포인트 및 모델 저장 완료 (Episode {episode+1})")

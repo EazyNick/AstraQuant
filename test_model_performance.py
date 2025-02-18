@@ -127,7 +127,7 @@ if __name__ == "__main__":
     device = torch.device(config_manager.get_device())
 
     # ✅ 모델 경로 설정
-    MODEL_PATH = os.path.join("output", "ppo_stock_trader_episode_76.pth")  # 모델 파일명 변경 가능
+    MODEL_PATH = os.path.join("output", "ppo_stock_trader_episode_313.pth")  # 모델 파일명 변경 가능
 
     # ✅ 테스트 데이터 불러오기
     stock_data, input_dim = load_stock_data("data/csv/sp500_test_data.csv")
