@@ -35,7 +35,7 @@ def load_stock_data(file_path):
     # ✅ 거래량(VMA_* 포함) 컬럼 제거
     selected_columns = [col for col in df.columns if "Volume" not in col and "VMA" not in col]
 
-    Slope_VMA 는 포함
+    # Slope_VMA 는 포함
     selected_columns = [
     col for col in df.columns 
     if "Volume" not in col and ("VMA_" not in col or "Slope_VMA" in col)
