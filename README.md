@@ -105,6 +105,12 @@ output/model_predictions.csv
 
 앞으로 추가적인 개선을 통해 **강화학습 기반 자동매매의 효율성을 극대화**할 수 있도록 발전시킬 계획입니다. 🚀
 
+## 📌 업데이트 예정
+
+- ActorCritic (V002)
+- tensorboard (V003)
+
+
 ## 📌 문의 및 이슈 등록
 
 - 문의: [kkkygsos@naver.com](mailto:kkkygsos@naver.com)
