@@ -67,7 +67,7 @@ if __name__ == "__main__":
     device = torch.device(config_manager.get_device())
 
     # ✅ 저장된 모델 로드
-    model_path = os.path.join(os.path.dirname(__file__), "output", "ppo_stock_trader_episode_79.pth")
+    model_path = os.path.join(os.path.dirname(__file__), "output", "ppo_stock_trader_episode_288.pth")
     stock_data, input_dim = load_stock_data("data/csv/TSLA_test_data.csv")  # ✅ 테스트 데이터 로드
     # stock_data, input_dim = load_stock_data("data/csv/sp500_test_data.csv")  # ✅ 테스트 데이터 로드
     model = load_model(model_path, StockTransformer, input_dim, device)
