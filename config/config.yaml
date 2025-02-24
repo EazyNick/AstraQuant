@@ -15,7 +15,7 @@ training:
   batch_size: 12          # 배치 크기
   learning_rate: 0.0003   # 학습률
   gamma: 0.99             # 할인율 (future reward 반영 비율)
-  epsilon: 0.2            # PPO 클리핑 파라미터
+  clampepsilon: 0.2            # PPO 클리핑 파라미터
   num_workers: NULL          # 병렬 환경 개수 (멀티 프로세싱 사용 시)
 
 model:

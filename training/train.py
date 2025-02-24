@@ -127,8 +127,9 @@ def train_agent(env, agent, episodes, training_manager):
 
         for t in range(len(env.stock_data) - config_manager.get_observation_window()):
             action = agent.select_action(state)  # PPOAgent가 액션 선택
-            next_state, reward, done, _ = env.step(action)
-            memory.append((state, action, reward))
+            next_state, reward, done, info = env.step(action)
+            real_action = info.get('real_action', action)  # 실제 수행된 액션 사용
+            memory.append((state, real_action, reward))  # 메모리에 실제 액션 저장
             state = next_state
             total_reward += reward
 
