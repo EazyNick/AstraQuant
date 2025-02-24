@@ -34,15 +34,12 @@ class StockTradingEnv(gym.Env):
         self.initial_balance = config_manager.get_initial_balance()
         self.observation_window = config_manager.get_observation_window()
         self.transaction_fee = config_manager.get_transaction_fee() 
-        self.epsilon = config_manager.get_epsilon()
         self.feature_dim = stock_data.shape[1] # 입력 데이터의 feature 개수 자동 설정
         self.stock_data = stock_data
         self.current_step = 0
         self.balance = self.initial_balance
         self.shares_held = 0 # 보유 주식 수
         self.previous_portfolio_value = self.initial_balance 
-        self.epsilon_min = 0.01
-        
         
         self.action_space = spaces.Discrete(3)  # 0: 매도, 1: 보유, 2: 매수
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.observation_window, self.feature_dim), dtype=np.float32)
@@ -63,11 +60,6 @@ class StockTradingEnv(gym.Env):
         """ 액션을 실행하고 새로운 상태, 보상, 종료 여부 반환 """
         price = self.stock_data[self.current_step, 0]
 
-        # 입실론(ε) 값을 이용한 랜덤 액션 (탐색)
-        if random.uniform(0, 1) < self.epsilon:
-            action = random.choice([0, 1, 2])  # 0: 매도, 1: 보유, 2: 매수
-            self.epsilon = max(self.epsilon * 0.999, self.epsilon_min)  # 0.999 → 지수적 감소
-
         if action == 2:  # 매수 (Buy)
             shares_to_buy = self.balance / (price * (1 + self.transaction_fee)) # 살 수 있는 최대 주식 수
             shares_to_buy = int(shares_to_buy) # 정수 값으로 변환 (소수점 이하 버림)
@@ -75,11 +67,18 @@ class StockTradingEnv(gym.Env):
             if cost <= self.balance:  # 잔고가 충분한 경우에만 매수
                 self.shares_held += shares_to_buy
                 self.balance -= cost
+                real_action = 2
+            else:
+                real_action = 1  # 관망(Hold)
 
-        elif action == 0:  # 매도 (Sell)
+        elif action == 0 and self.shares_held > 0: # 매도 (Sell)
             revenue = self.shares_held * price * (1 - self.transaction_fee)  # 거래 수수료 포함
             self.balance += revenue
             self.shares_held = 0  # 전량 매도
+            real_action = 0
+
+        else:
+            real_action = 1  # 관망(Hold)
 
         self.current_step += 1
         done = self.current_step >= len(self.stock_data) - self.observation_window
@@ -116,11 +115,11 @@ class StockTradingEnv(gym.Env):
         future_min_price = np.min(self.stock_data[self.current_step + 1:future_step + 1, 0])
         
         # 리워드 계산
-        if action == 2:  # 매수(Buy)
+        if real_action == 2:  # 매수(Buy)
             future_return = ((future_max_price - price) / price) * 100
-        elif action == 0:  # 매도(Sell)
+        elif real_action == 0:  # 매도(Sell)
             future_return = ((price - future_min_price) / price) * 100
-        elif action == 1:  # 관망(Hold)
+        elif real_action == 1:  # 관망(Hold)
             if self.shares_held:  # 주식을 보유 중이라면
                 future_return = ((future_max_price - price) / price) * 100 # 30일 내 최고가 대비 수익률
             else:  # 주식을 보유하지 않은 상태라면
@@ -138,7 +137,7 @@ class StockTradingEnv(gym.Env):
 
         # log_manager.logger.debug(f"Step: {self.current_step}, Action: {['Sell', 'Hold', 'Buy'][action]}, Reward: {reward}, Portfolio: {new_portfolio_value}, Shares Held: {self.shares_held}")
 
-        return next_state, reward, done, {}
+        return next_state, reward, done, {'real_action': real_action}
 
 if __name__ == "__main__":
     stock_data = np.random.randn(60, 5)

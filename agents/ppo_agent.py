@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
+import random
 import os
 import sys
 
@@ -32,15 +33,22 @@ class PPOAgent:
         self.model = model.to(self.device)  # 모델을 GPU/CPU로 이동
         self.optimizer = optim.Adam(self.model.parameters(), lr=config_manager.get_learning_rate()) # Adam Optimizer 설정
         self.gamma = config_manager.get_gamma() # 할인율(γ)
-        self.epsilon = config_manager.get_epsilon() # PPO 클리핑 파라미터(ε)
+        self.clampepsilon = config_manager.get_clampepsilon() # PPO 클리핑 파라미터(ε)
+        self.epsilon = config_manager.get_epsilon()
+        self.epsilon_min = 0.01  
+        self.epsilon_decay = 0.999
         self.batch_size = config_manager.get_batch_size() # 배치 크기
         self.criterion = nn.MSELoss() # 손실 함수 설정
 
     def select_action(self, state):
         """현재 상태에서 확률적으로 액션을 선택"""
-        state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(self.device)  # (1, seq_len, feature_dim)
-        probs = torch.softmax(self.model(state), dim=-1) # 현재 상태(state)를 StockTransformer 모델에 입력, probs = 확률 분포 πθ(a|s)
-        action = torch.multinomial(probs, 1).item() # 확률 기반 액션 샘플링
+        if random.uniform(0, 1) < self.epsilon:
+            action = random.choice([0, 1, 2])
+        else:
+            state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(self.device)  # (1, seq_len, feature_dim)
+            probs = torch.softmax(self.model(state), dim=-1) # 현재 상태(state)를 StockTransformer 모델에 입력, probs = 확률 분포 πθ(a|s)
+            action = torch.multinomial(probs, 1).item() # 확률 기반 액션 샘플링
+        self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min) # 0.999 → 지수적 감소
         return action
 
     def update(self, memory):
@@ -71,7 +79,7 @@ class PPOAgent:
 
             # ✅ 3. PPO Clipped Objective 계산
             ratio = action_probs / old_probs # 확률 비율(`π_new / π_old`) 계산
-            clipped_ratio = torch.clamp(ratio, 1 - self.epsilon, 1 + self.epsilon) # 확률 비율이 너무 커지지 않도록 클리핑(ε=0.2) 적용
+            clipped_ratio = torch.clamp(ratio, 1 - self.clampepsilon, 1 + self.clampepsilon) # 확률 비율이 너무 커지지 않도록 클리핑(ε=0.2) 적용
             loss = -torch.min(ratio * batch_rewards, clipped_ratio * batch_rewards).mean() # 손실 함수
 
             # ✅ 4. 모델 업데이트

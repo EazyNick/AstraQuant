@@ -100,8 +100,8 @@ class ConfigManager:
     def get_gamma(self):
         return self.config["training"]["gamma"]
 
-    def get_epsilon(self):
-        return self.config["training"]["epsilon"]
+    def get_clampepsilon(self):
+        return self.config["training"]["clampepsilon"]
 
     def get_num_workers(self):
         return self.config["training"]["num_workers"]
