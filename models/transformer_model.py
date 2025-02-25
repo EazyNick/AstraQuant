@@ -84,6 +84,9 @@ class StockTransformer(nn.Module):
         x = self.positional_encoding(x)  # 🔹 Positional Encoding(위치 정보) 추가
         x = self.transformer(x)  # Transformer 인코더를 통과
 
+        # ⚠️ Transformer 출력값 클리핑 (안정성 강화)
+        x = torch.clamp(x, -10, 10)
+
         output = self.fc(x[:, -1, :])  # 마지막 타임스텝의 출력을 사용하여 매매 신호 예측
         # log_manager.logger.debug(f"최종 출력 shape: {output.shape}")  # 최종 출력 shape 확인
 
