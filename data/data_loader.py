@@ -32,17 +32,24 @@ def load_stock_data(file_path):
     # # ✅ 숫자형 데이터 변환 (기존 방식 유지)
     # df[df.select_dtypes(include=[np.number]).columns] = df.select_dtypes(include=[np.number])
 
-    # ✅ 거래량(VMA_* 포함) 컬럼 제거
-    selected_columns = [col for col in df.columns if "Volume" not in col and "VMA" not in col]
-
     # Slope_VMA 는 포함
     selected_columns = [
     col for col in df.columns 
     if "Volume" not in col and ("VMA_" not in col or "Slope_VMA" in col)
     ]
 
-    # ✅ 날짜(Date) 컬럼 제외하고 numpy 배열로 변환
-    data = df[selected_columns].drop(columns=['Date'], errors='ignore').values
+    # ✅ 날짜(Date) 컬럼 제외하고 데이터 변환
+    df = df[selected_columns].drop(columns=['Date'], errors='ignore')
+
+    # ✅ Slope 값에만 Tanh 변환 적용
+    slope_columns = [col for col in df.columns if "Slope" in col]
+    # print(f"🎯 Tanh 변환 적용 열: {slope_columns}")  # 변환 대상 열 확인용 로그
+
+    # `tanh` 변환 적용 (Slope 값만)
+    df[slope_columns] = np.tanh(df[slope_columns])
+
+    # ✅ Numpy 배열로 변환
+    data = df.values
 
     # ✅ 입력 피처 개수 반환
     input_dim = data.shape[1]

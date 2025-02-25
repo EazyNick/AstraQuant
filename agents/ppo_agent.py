@@ -47,12 +47,12 @@ class PPOAgent:
         else:
             state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(self.device)  # (1, seq_len, feature_dim)
             probs = torch.softmax(self.model(state), dim=-1) # 현재 상태(state)를 StockTransformer 모델에 입력, probs = 확률 분포 πθ(a|s)
-            action = torch.multinomial(probs, 1).item() # 확률 기반 액션 샘플링
 
             # ⚠️ 확률 값의 유효성 검사만 진행 (클리핑 X)
             if not torch.isfinite(probs).all() or (probs < 0).any():
                 print("⚠️ Invalid probability tensor detected:", probs)
                 return random.choice([0, 1, 2])  # 문제가 발생하면 랜덤 액션 반환
+            action = torch.multinomial(probs, 1).item() # 확률 기반 액션 샘플링
 
         self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min) # 0.999 → 지수적 감소
         return action
