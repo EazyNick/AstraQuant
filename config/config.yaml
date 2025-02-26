@@ -13,13 +13,13 @@ env:
 training:
   episodes: 10000       # 학습 에피소드 수
   batch_size: 12          # 배치 크기
-  learning_rate: 0.0003   # 학습률
+  learning_rate: 0.0002   # 학습률
   gamma: 0.99             # 할인율 (future reward 반영 비율)
   clampepsilon: 0.2            # PPO 클리핑 파라미터
   num_workers: NULL          # 병렬 환경 개수 (멀티 프로세싱 사용 시)
 
 model:
   input_dim: 1           # 입력 피처 개수 (자동 설정 가능)
-  model_dim: 1024           # Transformer 모델 차원
+  model_dim: 512           # Transformer 모델 차원
   num_heads: 4            # Transformer Multi-Head Attention 개수, 각 칼럼에 가중치를 다르게 두고 학습
   num_layers: 4           # Transformer 레이어 개수
