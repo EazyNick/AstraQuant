@@ -90,6 +90,12 @@ class StockTransformer(nn.Module):
         output = self.fc(x[:, -1, :])  # 마지막 타임스텝의 출력을 사용하여 매매 신호 예측
         # log_manager.logger.debug(f"최종 출력 shape: {output.shape}")  # 최종 출력 shape 확인
 
+        # FC 레이어 출력의 유효성 검사
+        if not torch.isfinite(output).all():
+            print("⚠️ Invalid logits detected in FC layer:", output)
+            print("🧮 FC Layer 출력 통계: min =", output.min().item(), "max =", output.max().item(), "mean =", output.mean().item())
+            output = torch.zeros_like(output)  # 안전한 값으로 초기화
+
         return output
 
 # ✅ StockTransformer 단독 테스트

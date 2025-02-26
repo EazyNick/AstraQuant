@@ -46,12 +46,23 @@ class PPOAgent:
             action = random.choice([0, 1, 2])
         else:
             state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(self.device)  # (1, seq_len, feature_dim)
-            probs = torch.softmax(self.model(state), dim=-1) # 현재 상태(state)를 StockTransformer 모델에 입력, probs = 확률 분포 πθ(a|s)
+
+            if not torch.isfinite(state).all():
+                print("⚠️ Invalid state detected:", state)
+            
+            logits = self.model(state)  # 모델의 원시 출력
+        
+            # 🔍 모델 출력(logits)의 유효성 검사
+            if not torch.isfinite(logits).all():
+                print("⚠️ Invalid logits detected:", logits)
+
+            probs = torch.softmax(logits, dim=-1) # 현재 상태(state)를 StockTransformer 모델에 입력, probs = 확률 분포 πθ(a|s)
 
             # ⚠️ 확률 값의 유효성 검사만 진행 (클리핑 X)
             if not torch.isfinite(probs).all() or (probs < 0).any():
                 print("⚠️ Invalid probability tensor detected:", probs)
                 return random.choice([0, 1, 2])  # 문제가 발생하면 랜덤 액션 반환
+            
             action = torch.multinomial(probs, 1).item() # 확률 기반 액션 샘플링
 
         self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min) # 0.999 → 지수적 감소
@@ -84,13 +95,26 @@ class PPOAgent:
             old_probs = action_probs.detach() # 이전 정책(`π_old`) 확률 저장
 
             # ✅ 3. PPO Clipped Objective 계산
-            ratio = action_probs / old_probs # 확률 비율(`π_new / π_old`) 계산
+            # old_probs가 0이 되지 않도록 작은 epsilon을 추가
+            epsilon = 1e-8
+            ratio = action_probs / (old_probs + epsilon) # 확률 비율(`π_new / π_old`) 계산
+            # ratio의 유효성 검사
+            if not torch.isfinite(ratio).all():
+                print("⚠️ Invalid ratio detected:", ratio)
+            
             clipped_ratio = torch.clamp(ratio, 1 - self.clampepsilon, 1 + self.clampepsilon) # 확률 비율이 너무 커지지 않도록 클리핑(ε=0.2) 적용
             loss = -torch.min(ratio * batch_rewards, clipped_ratio * batch_rewards).mean() # 손실 함수
 
             # ✅ 4. 모델 업데이트
             self.optimizer.zero_grad()
             loss.backward() # PPO 손실을 역전파(Backpropagation)하여 모델의 가중치 업데이트
+
+            # 각 파라미터의 기울기(Gradient) 값을 확인(기울기 폭발 값)
+            for name, param in self.model.named_parameters():
+                if param.grad is not None and not torch.isfinite(param.grad).all():
+                    print(f"⚠️ Invalid gradient detected in {name}: {param.grad}")
+                    return  # 학습을 중단하고 디버깅을 진행
+
             self.optimizer.step() # Adam Optimizer를 사용하여 가중치 조정
 
 if __name__ == "__main__":
