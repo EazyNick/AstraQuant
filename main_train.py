@@ -34,7 +34,7 @@ log_manager.logger.info(f"✅ 학습 장치 설정: {device}")
 
 # ✅ 데이터 로드 (input_dim 자동 추출)
 log_manager.logger.info("데이터 불러오기...")
-stock_prices, input_dim = load_stock_data("data/csv/sp500_training_data.csv")
+stock_prices, input_dim = load_stock_data("data/csv/GSPC_combined_train_data.csv")
 log_manager.logger.info(f"입력 피처 개수: {input_dim}")
 
 # ✅ 환경 및 모델 생성 (config.yaml에서 설정값 자동 적용)

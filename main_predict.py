@@ -66,7 +66,7 @@ if __name__ == "__main__":
     import pandas as pd
     # ✅ 설정 가져오기
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_path', type=str, default=os.path.join(os.path.dirname(__file__), 'output', 'ppo_stock_trader_episode_288.pth'), help='사용할 모델 가중치 파일 (.pth) 경로 (기본값: ppo_stock_trader_episode_288.pth)')
+    parser.add_argument('--model_path', type=str, default=os.path.join(os.path.dirname(__file__), 'output', 'ppo_stock_trader_episode_296.pth'), help='사용할 모델 가중치 파일 (.pth) 경로 (기본값: ppo_stock_trader_episode_288.pth)')
     parser.add_argument('--test_data', type=str, default='data/csv/sp500_test_data.csv', help='테스트 데이터 (.csv) 파일 경로 (기본값: data/csv/sp500_test_data.csv)')
     args = parser.parse_args()
 
@@ -74,7 +74,7 @@ if __name__ == "__main__":
 
     # ✅ 저장된 모델 로드 
     stock_data, input_dim = load_stock_data(args.test_data or 'data/csv/sp500_test_data.csv')
-    model = load_model(args.model_path or os.path.join(os.path.dirname(__file__), 'output', 'ppo_stock_trader_episode_288.pth'), StockTransformer, input_dim, device)
+    model = load_model(args.model_path or os.path.join(os.path.dirname(__file__), 'output', 'ppo_stock_trader_episode_296.pth'), StockTransformer, input_dim, device)
 
     df = pd.read_csv(args.test_data or 'data/csv/sp500_test_data.csv')
     dates = df['Date'].values # ✅ 날짜 데이터 저장
@@ -108,3 +108,6 @@ if __name__ == "__main__":
 
     summary = f"총 매도: {total_sell}건, 총 관망: {total_hold}건, 총 매수: {total_buy}건"
     log_manager.logger.info(summary)
+
+    # 예시 명령어
+    # python main_predict.py --model_path output/ppo_stock_trader_episode_6.pth --test_data data/csv/sp500_test_data.csv
