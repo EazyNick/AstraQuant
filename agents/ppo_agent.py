@@ -34,7 +34,6 @@ class PPOAgent:
         self.optimizer = optim.Adam(self.model.parameters(), lr=config_manager.get_learning_rate()) # Adam Optimizer 설정
         self.gamma = config_manager.get_gamma() # 할인율(γ)
         self.clampepsilon = config_manager.get_clampepsilon() # PPO 클리핑 파라미터(ε)
-        self.epsilon = config_manager.get_epsilon()
         self.epsilon_min = 0.01  
         self.epsilon_decay = 0.999
         self.batch_size = config_manager.get_batch_size() # 배치 크기
@@ -42,30 +41,26 @@ class PPOAgent:
 
     def select_action(self, state):
         """현재 상태에서 확률적으로 액션을 선택"""
-        if random.uniform(0, 1) < self.epsilon:
-            action = random.choice([0, 1, 2])
-        else:
-            state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(self.device)  # (1, seq_len, feature_dim)
+        state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(self.device)  # (1, seq_len, feature_dim)
 
-            if not torch.isfinite(state).all():
-                print("⚠️ Invalid state detected:", state)
-            
-            logits = self.model(state)  # 모델의 원시 출력
+        if not torch.isfinite(state).all():
+            print("⚠️ Invalid state detected:", state)
         
-            # 🔍 모델 출력(logits)의 유효성 검사
-            if not torch.isfinite(logits).all():
-                print("⚠️ Invalid logits detected:", logits)
+        logits = self.model(state)  # 모델의 원시 출력
 
-            probs = torch.softmax(logits, dim=-1) # 현재 상태(state)를 StockTransformer 모델에 입력, probs = 확률 분포 πθ(a|s)
+        # 🔍 모델 출력(logits)의 유효성 검사
+        if not torch.isfinite(logits).all():
+            print("⚠️ Invalid logits detected:", logits)
 
-            # ⚠️ 확률 값의 유효성 검사만 진행 (클리핑 X)
-            if not torch.isfinite(probs).all() or (probs < 0).any():
-                print("⚠️ Invalid probability tensor detected:", probs)
-                return random.choice([0, 1, 2])  # 문제가 발생하면 랜덤 액션 반환
-            
-            action = torch.multinomial(probs, 1).item() # 확률 기반 액션 샘플링
+        probs = torch.softmax(logits, dim=-1) # 현재 상태(state)를 StockTransformer 모델에 입력, probs = 확률 분포 πθ(a|s)
 
-        self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min) # 0.999 → 지수적 감소
+        # ⚠️ 확률 값의 유효성 검사만 진행 (클리핑 X)
+        if not torch.isfinite(probs).all() or (probs < 0).any():
+            print("⚠️ Invalid probability tensor detected:", probs)
+            return random.choice([0, 1, 2])  # 문제가 발생하면 랜덤 액션 반환
+
+        action = torch.multinomial(probs, 1).item() # 확률 기반 액션 샘플링
+        
         return action
 
     def update(self, memory):

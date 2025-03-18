@@ -32,12 +32,12 @@ def load_stock_data(file_path):
     # # ✅ 숫자형 데이터 변환 (기존 방식 유지)
     # df[df.select_dtypes(include=[np.number]).columns] = df.select_dtypes(include=[np.number])
 
-    # ✅ 이동평균선 제외, 기울기(Slope)만 포함
-    selected_columns = [col for col in df.columns if "Slope" in col]
+    # ✅ 이동평균선 제외, 기울기(Slope) 및 가격(Close)만 포함
+    selected_columns = [col for col in df.columns if "Slope" in col or "Close" in col]
 
     # ✅ 선택된 칼럼명을 저장
     selected_feature_names = df[selected_columns].columns.tolist()
-    print(selected_feature_names)
+    print(f"📌 선택된 피처: {selected_feature_names}")
 
     # ✅ 날짜(Date) 컬럼 제외하고 데이터 변환
     df = df[selected_columns]

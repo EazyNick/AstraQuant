@@ -7,7 +7,6 @@ general:
 env:
   initial_balance: 10000000  # 초기 잔액
   observation_window: 30  # 한 번에 입력하는 시계열 길이
-  epsilon: 0.2             # 탐색(Exploration) 확률 (20%)
   transaction_fee: 0.001    # 거래 수수료 (0.1% = 0.001)
 
 training:

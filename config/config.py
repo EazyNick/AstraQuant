@@ -79,8 +79,6 @@ class ConfigManager:
     def get_observation_window(self):
         return self.config["env"]["observation_window"]
     
-    def get_epsilon(self):
-        return self.config["env"].get("epsilon", 0.1)  # ✅ 기본값 설정
 
     def get_transaction_fee(self):
         return self.config["env"].get("transaction_fee", 0.001)  # 기본값 설정
@@ -145,8 +143,8 @@ class ConfigManager:
     def set_gamma(self, value):
         self.config["training"]["gamma"] = value
 
-    def set_epsilon(self, value):
-        self.config["training"]["epsilon"] = value
+    def set_clampepsilon(self, value):
+        self.config["training"]["clampepsilon"] = value
 
     def set_num_workers(self, value):
         self.config["training"]["num_workers"] = value
@@ -165,9 +163,6 @@ class ConfigManager:
 
     def set_transaction_fee(self, value):
         self.config["env"]["transaction_fee"] = value
-
-    def set_epsilon(self, value):
-        self.config["env"]["epsilon"] = value
 
     def save_config(self):
         """ 변경된 설정을 config.yaml 파일에 저장 """
