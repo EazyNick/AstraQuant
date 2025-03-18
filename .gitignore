@@ -4,6 +4,8 @@ __pycache__/
 
 # Ignore temporary assets and logs
 logs/log/*
+logs/ppo_training/*
+logs/trading_env/*
 *.pyc
 *.csv
 *.pth

@@ -5,6 +5,7 @@ import numpy as np
 import random
 import os
 import sys
+from tensorboardX import SummaryWriter  # TensorBoard
 
 current_file = os.path.abspath(__file__) 
 project_root = os.path.abspath(os.path.join(current_file, "..", "..")) # 현재 디렉토리에 따라 이 부분 수정
@@ -39,6 +40,10 @@ class PPOAgent:
         self.batch_size = config_manager.get_batch_size() # 배치 크기
         self.criterion = nn.MSELoss() # 손실 함수 설정
 
+        # ✅ TensorBoard 설정
+        self.writer = SummaryWriter(log_dir="logs/ppo_training")
+        self.train_step = 0  # 학습 스텝 카운트
+
     def select_action(self, state):
         """현재 상태에서 확률적으로 액션을 선택"""
         state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(self.device)  # (1, seq_len, feature_dim)
@@ -47,12 +52,19 @@ class PPOAgent:
             print("⚠️ Invalid state detected:", state)
         
         logits = self.model(state)  # 모델의 원시 출력
-
+        print(f"Raw logits: {logits}")
         # 🔍 모델 출력(logits)의 유효성 검사
         if not torch.isfinite(logits).all():
             print("⚠️ Invalid logits detected:", logits)
 
         probs = torch.softmax(logits, dim=-1) # 현재 상태(state)를 StockTransformer 모델에 입력, probs = 확률 분포 πθ(a|s)
+
+        # ✅ TensorBoard에 action 확률 기록
+        self.writer.add_scalars("Action Probabilities", {
+            "Sell": probs[0, 0].item(),
+            "Hold": probs[0, 1].item(),
+            "Buy": probs[0, 2].item(),
+        }, self.train_step)
 
         # ⚠️ 확률 값의 유효성 검사만 진행 (클리핑 X)
         if not torch.isfinite(probs).all() or (probs < 0).any():
@@ -60,7 +72,8 @@ class PPOAgent:
             return random.choice([0, 1, 2])  # 문제가 발생하면 랜덤 액션 반환
 
         action = torch.multinomial(probs, 1).item() # 확률 기반 액션 샘플링
-        
+        self.train_step += 1  # 학습 스텝 증가
+
         return action
 
     def update(self, memory):
@@ -100,6 +113,9 @@ class PPOAgent:
             clipped_ratio = torch.clamp(ratio, 1 - self.clampepsilon, 1 + self.clampepsilon) # 확률 비율이 너무 커지지 않도록 클리핑(ε=0.2) 적용
             loss = -torch.min(ratio * batch_rewards, clipped_ratio * batch_rewards).mean() # 손실 함수
 
+            # ✅ TensorBoard에 손실 값 기록
+            self.writer.add_scalar("Loss", loss.item(), self.train_step)
+
             # ✅ 4. 모델 업데이트
             self.optimizer.zero_grad()
             loss.backward() # PPO 손실을 역전파(Backpropagation)하여 모델의 가중치 업데이트
@@ -111,6 +127,7 @@ class PPOAgent:
                     return  # 학습을 중단하고 디버깅을 진행
 
             self.optimizer.step() # Adam Optimizer를 사용하여 가중치 조정
+            self.train_step += 1  # 학습 단계 증가
 
 if __name__ == "__main__":
     from models.transformer_model import StockTransformer
