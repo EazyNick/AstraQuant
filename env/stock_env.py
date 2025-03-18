@@ -109,8 +109,8 @@ class StockTradingEnv(gym.Env):
             holding_reward = 0
 
         # 10일 후의 `Buy & Hold` 수익률 계산
-        future_step = min(self.current_step + 10, len(self.stock_data) - 1)
-        # 현재 스텝을 제외한 10일 이내의 최고가 & 최저가 찾기
+        future_step = min(self.current_step + 25, len(self.stock_data) - 1)
+        # 현재 스텝을 제외한 25일 이내의 최고가 & 최저가 찾기
         future_max_price = np.max(self.stock_data[self.current_step + 1:future_step + 1, 0])
         future_min_price = np.min(self.stock_data[self.current_step + 1:future_step + 1, 0])
         
