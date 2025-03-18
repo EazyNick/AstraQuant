@@ -32,14 +32,16 @@ def load_stock_data(file_path):
     # # ✅ 숫자형 데이터 변환 (기존 방식 유지)
     # df[df.select_dtypes(include=[np.number]).columns] = df.select_dtypes(include=[np.number])
 
-    # Slope_VMA 는 포함
-    selected_columns = [
-    col for col in df.columns 
-    if "Volume" not in col and ("VMA_" not in col or "Slope_VMA" in col)
-    ]
+    # ✅ 이동평균선 제외, 기울기(Slope)만 포함
+    selected_columns = [col for col in df.columns if "Slope" in col]
+
+    # ✅ 선택된 칼럼명을 저장
+    selected_feature_names = df[selected_columns].columns.tolist()
+    print(selected_feature_names)
 
     # ✅ 날짜(Date) 컬럼 제외하고 데이터 변환
-    df = df[selected_columns].drop(columns=['Date'], errors='ignore')
+    df = df[selected_columns]
+
 
     # # ✅ Slope 값에만 Tanh 변환 적용
     # slope_columns = [col for col in df.columns if "Slope" in col]
@@ -53,6 +55,7 @@ def load_stock_data(file_path):
 
     # ✅ 입력 피처 개수 반환
     input_dim = data.shape[1]
+
     return data, input_dim
 
 # ✅ 테스트 코드 추가
@@ -60,7 +63,7 @@ if __name__ == "__main__":
     import os
 
     # ✅ 샘플 CSV 파일 경로 설정
-    sample_file = "data/csv/sp500_training_data.csv"
+    sample_file = "data/csv/GSPC_combined_test_data.csv"
 
     # ✅ 파일이 존재하는지 확인 후 로드
     if os.path.exists(sample_file):
