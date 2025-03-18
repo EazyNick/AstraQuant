@@ -118,7 +118,6 @@ def train_agent(env, agent, episodes, training_manager):
     # 체크포인트 로드 (이전 학습 기록이 있으면 이어서 시작)
     start_episode = training_manager.load_checkpoint(agent.model, agent.optimizer)
     best_reward = float('-inf')  # 최고 리워드 기록 초기화
-    saveflag = False
 
     for episode in range(start_episode, episodes):
         state = env.reset()
@@ -126,10 +125,14 @@ def train_agent(env, agent, episodes, training_manager):
         total_reward = 0
 
         for t in range(len(env.stock_data) - config_manager.get_observation_window()):
-            action = agent.select_action(state)  # PPOAgent가 액션 선택
-            next_state, reward, done, info = env.step(action)
-            real_action = info.get('real_action', action)  # 실제 수행된 액션 사용
-            memory.append((state, real_action, reward))  # 메모리에 실제 액션 저장
+            # balance = env.balance
+            # shares_held = env.shares_held
+            # current_price = env.stock_data[env.current_step, 0]
+
+            # ✅ PPOAgent에게 환경 정보를 전달하여 액션 선택
+            action = agent.select_action(state)
+            next_state, reward, done = env.step(action)
+            memory.append((state, action, reward))  # 메모리에 실제 액션 저장
             state = next_state
             total_reward += reward
 
@@ -147,7 +150,7 @@ def train_agent(env, agent, episodes, training_manager):
             log_manager.logger.info(f"✅ 체크포인트 및 모델 저장 완료 (Episode {episode+1})")
 
          # 현재 에피소드의 보상이 최고 보상(best_reward)보다 높을 경우 저장
-        if saveflag == False and total_reward > best_reward:
+        if total_reward > best_reward:
             best_reward = total_reward  # 최고 리워드 갱신
             training_manager.save_model(agent.model, episode=(episode + 1))
             training_manager.save_checkpoint(agent.model, agent.optimizer, episode + 1)  # 체크포인트 저장
