@@ -141,7 +141,7 @@ def train_agent(env, agent, episodes, training_manager):
                 memory = []  # 배치 학습 후 메모리 초기화
 
         final_portfolio_value = env.balance + (env.shares_held * env.stock_data[env.current_step, 0])
-        log_manager.logger.debug(f"Episode {episode+1}/{episodes}, Total Reward: {total_reward}, final_portfolio_value: {final_portfolio_value:.2f}")
+        log_manager.logger.info(f"Episode {episode+1}/{episodes}, Total Reward: {total_reward}, final_portfolio_value: {final_portfolio_value:.2f}")
 
         # 매 100번째 에피소드마다 모델과 체크포인트 저장
         if (episode + 1) % 50 == 0:

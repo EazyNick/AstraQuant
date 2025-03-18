@@ -3,8 +3,8 @@
 import numpy as np
 import gym
 from gym import spaces
-import random
 import torch
+from tensorboardX import SummaryWriter  # TensorBoard 
 
 import os
 import sys
@@ -44,9 +44,15 @@ class StockTradingEnv(gym.Env):
         self.action_space = spaces.Discrete(3)  # 0: 매도, 1: 보유, 2: 매수
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.observation_window, self.feature_dim), dtype=np.float32)
 
-    def normalize_reward(self, value, scale=50000): # -1,000 ~ 1,000
-        value = torch.tensor(value, dtype=torch.float32).to(self.device)  # Tensor 변환 후 GPU/CPU 이동
-        return torch.tanh(value / scale) * scale  # 정규화 적용
+        # ✅ TensorBoard 추가
+        self.writer = SummaryWriter(log_dir="logs/trading_env")
+        self.train_step = 0  # 학습 스텝 카운트
+        self.total_reward = 0  # 최종 보상 추적용 변수
+
+    def normalize_reward(self, value, scale=50000):
+        value = torch.tensor(value, dtype=torch.float32).to(self.device)
+        sign = torch.sign(value)  # 값의 부호 유지
+        return sign * torch.log1p(abs(value) / scale) * scale  # log(1 + |value|) 방식
 
     def reset(self):
         """ 환경을 초기화하고 초기 상태를 반환 """
@@ -69,7 +75,7 @@ class StockTradingEnv(gym.Env):
                 self.shares_held += shares_to_buy
                 self.balance -= cost
             else:
-                reward -= 100000  # 매수를 원했지만 실패한 경우 패널티 추가
+                reward -= 1000000  # 매수를 원했지만 실패한 경우 패널티 추가
 
         elif action == 0:
             if self.shares_held > 0: # 매도 (Sell)
@@ -77,7 +83,7 @@ class StockTradingEnv(gym.Env):
                 self.balance += revenue
                 self.shares_held = 0  # 전량 매도
             else:
-                reward -= -150000  # 매도를 원했지만 실패한 경우 패널티 추가
+                reward -= -1500000  # 매도를 원했지만 실패한 경우 패널티 추가
         
         self.current_step += 1
         done = self.current_step >= len(self.stock_data) - self.observation_window
@@ -120,9 +126,9 @@ class StockTradingEnv(gym.Env):
                 future_return = ((future_max_price - price) / price) * self.shares_held * 100
         elif action == 0:  # 매도(Sell)
             if future_min_price >= price:  # 미래 최저가가 현재 가격보다 높거나 같으면 손실 가능성이 큼
-                future_return = ((price - future_max_price) / price) * self.shares_held * 100
+                future_return = ((price - future_max_price) / price) * self.shares_held * 75
             else:  # 미래 최저가가 현재 가격보다 낮으면 기존 방식 유지
-                future_return = ((price - future_min_price) / price) * self.shares_held * 100
+                future_return = ((price - future_min_price) / price) * self.shares_held * 75
 
         elif action == 1:  # 관망(Hold)
             if self.shares_held > 0:  # 주식을 보유 중이라면
@@ -143,11 +149,18 @@ class StockTradingEnv(gym.Env):
 
         # ✅ 최종 보상 (각 보상 요소를 합산)
         reward = short_term_reward + long_term_reward + holding_reward + future_reward + reward
+        self.total_reward += reward  # ✅ 누적 보상 업데이트
+
+        # ✅ TensorBoard 기록
+        self.writer.add_scalar("Portfolio Value", new_portfolio_value, self.train_step)
+        self.writer.add_scalar("Shares Held", self.shares_held, self.train_step)
+        self.writer.add_scalar("Reward/Total", self.total_reward, self.train_step)  # ✅ 최종 보상 기록
 
         # ✅ 보상 정규화 적용
         reward = self.normalize_reward(reward)
 
-        self.previous_portfolio_value = new_portfolio_value  
+        self.previous_portfolio_value = new_portfolio_value
+        self.train_step += 1  # 학습 스텝 증가  
 
         # log_manager.logger.debug(f"Step: {self.current_step}, Action: {['Sell', 'Hold', 'Buy'][action]}, Reward: {reward}, Portfolio: {new_portfolio_value}, Shares Held: {self.shares_held}")
 

@@ -2,13 +2,15 @@
 
 # conda activate AstraQuant
 
+# tensorboard --logdir=logs/trading_env 파이썬 3.13버전에서는 텐서보드 안됨
+
 import os, sys
 from env.stock_env import StockTradingEnv
 from models.transformer_model import StockTransformer
 from agents.ppo_agent import PPOAgent
 from training.train import TrainingManager, train_agent
 from data.data_loader import load_stock_data
-from config import config_manager  # ✅ 싱글턴 ConfigManager 사용
+from config import config_manager  # 싱글턴 ConfigManager 사용
 import torch
 
 current_file = os.path.abspath(__file__) 
