@@ -60,7 +60,13 @@ class StockTradingEnv(gym.Env):
         self.balance = self.initial_balance
         self.shares_held = 0
         self.previous_portfolio_value = self.initial_balance 
-        return self.stock_data[self.current_step:self.current_step + self.observation_window] # (observation_window 값, feature_dim) 크기의 배열 반환
+
+        # 🔹 기존 상태 (주가 데이터) + 보유 주식 수 추가
+        state = self.stock_data[self.current_step:self.current_step + self.observation_window]
+        shares_held_feature = np.full((self.observation_window, 1), self.shares_held)  # 보유 주식수를 feature로 추가
+        state_with_shares = np.hstack((state, shares_held_feature))  # 상태 확장
+        
+        return state_with_shares
 
     def step(self, action):
         """ 액션을 실행하고 새로운 상태, 보상, 종료 여부 반환 """
@@ -75,7 +81,7 @@ class StockTradingEnv(gym.Env):
                 self.shares_held += shares_to_buy
                 self.balance -= cost
             else:
-                reward -= 1000000  # 매수를 원했지만 실패한 경우 패널티 추가
+                reward -= 10 * self.shares_held  # 매수를 원했지만 실패한 경우 패널티 추가
 
         elif action == 0:
             if self.shares_held > 0: # 매도 (Sell)
@@ -83,11 +89,15 @@ class StockTradingEnv(gym.Env):
                 self.balance += revenue
                 self.shares_held = 0  # 전량 매도
             else:
-                reward -= -1500000  # 매도를 원했지만 실패한 경우 패널티 추가
+                reward -= -11 * self.shares_held  # 매도를 원했지만 실패한 경우 패널티 추가
         
         self.current_step += 1
         done = self.current_step >= len(self.stock_data) - self.observation_window
         next_state = self.stock_data[self.current_step:self.current_step + self.observation_window]
+
+        # 🔹 보유 주식수 feature 추가
+        shares_held_feature = np.full((self.observation_window, 1), self.shares_held)
+        next_state_with_shares = np.hstack((next_state, shares_held_feature))
 
         # 새로운 포트폴리오 가치 계산
         new_portfolio_value = self.balance + (self.shares_held * price)
@@ -98,54 +108,54 @@ class StockTradingEnv(gym.Env):
         future_reward = 0
 
         # 포트폴리오 가치 변화율을 보상으로 설정 (수익률 기반 보상), 단기 수익률 보상
-        if self.previous_portfolio_value > 0:
-            short_term_reward = ((new_portfolio_value - self.previous_portfolio_value) / self.previous_portfolio_value) * 100 * 50
-        else:
-            short_term_reward = 0
+        # if self.previous_portfolio_value > 0:
+        #     short_term_reward = ((new_portfolio_value - self.previous_portfolio_value) / self.previous_portfolio_value) * 100 * 2
+        # else:
+        #     short_term_reward = 0
 
         # 장기적 보상을 반영하도록 강화 (현재 가치 대비 초기 가치)
-        long_term_reward = ((new_portfolio_value - self.initial_balance) / self.initial_balance) * 100 * 5
+        long_term_reward = ((new_portfolio_value - self.initial_balance) / self.initial_balance) * 100 * 2
 
-        # 보유 주식 가격 상승 시 추가 보상
-        if self.shares_held > 0 and self.current_step > 0:
-            holding_reward = (price - self.stock_data[self.current_step - 1, 0]) * self.shares_held * 2
-        else:
-            holding_reward = 0
+        # # 보유 주식 가격 상승 시 추가 보상
+        # if self.shares_held > 0 and self.current_step > 0:
+        #     holding_reward = (price - self.stock_data[self.current_step - 1, 0]) * self.shares_held * 1
+        # else:
+        #     holding_reward = 0
 
-        # 25일 후의 `Buy & Hold` 수익률 계산
-        future_step = min(self.current_step + 25, len(self.stock_data) - 1)
-        # 현재 스텝을 제외한 25일 이내의 최고가 & 최저가 찾기
+        # 18일 후의 `Buy & Hold` 수익률 계산
+        future_step = min(self.current_step + 18, len(self.stock_data) - 1)
+        # 현재 스텝을 제외한 18일 이내의 최고가 & 최저가 찾기
         future_max_price = np.max(self.stock_data[self.current_step + 1:future_step + 1, 0])
         future_min_price = np.min(self.stock_data[self.current_step + 1:future_step + 1, 0])
         
         # 리워드 계산
         if action == 2:  # 매수(Buy)
             if future_max_price <= price:  # 미래 최고가가 현재 가격보다 낮거나 같으면 손실 가능성이 큼
-                future_return = ((future_min_price - price) / price) * self.shares_held * 100
+                future_return = ((future_min_price - price) / price) * self.shares_held * 1.5
             else:  # 미래 최고가가 현재 가격보다 높으면 기존 방식 유지
-                future_return = ((future_max_price - price) / price) * self.shares_held * 100
+                future_return = ((future_max_price - price) / price) * self.shares_held * 1.2
         elif action == 0:  # 매도(Sell)
             if future_min_price >= price:  # 미래 최저가가 현재 가격보다 높거나 같으면 손실 가능성이 큼
-                future_return = ((price - future_max_price) / price) * self.shares_held * 75
+                future_return = ((price - future_max_price) / price) * self.shares_held * 1.2
             else:  # 미래 최저가가 현재 가격보다 낮으면 기존 방식 유지
-                future_return = ((price - future_min_price) / price) * self.shares_held * 75
+                future_return = ((price - future_min_price) / price) * self.shares_held * 1.5
 
         elif action == 1:  # 관망(Hold)
             if self.shares_held > 0:  # 주식을 보유 중이라면
                 # 미래 최고가와 현재 가격 비교
                 if future_max_price > price:  # 가격이 오를 경우 큰 보상
-                    future_return = ((future_max_price - price) / price) * self.shares_held * 100  # 가격 상승 보상
+                    future_return = ((future_max_price - price) / price) * self.shares_held * 1.2  # 가격 상승 보상
                 else:  # 가격이 떨어지거나 그대로인 경우 패널티
-                    future_return = ((future_min_price - price) / price) * self.shares_held * 200  # 패널티는 더 크게 (음수값)
+                    future_return = ((future_min_price - price) / price) * self.shares_held * 3  # 패널티는 더 크게 (음수값)
             else:  # 주식을 보유하지 않은 상태라면
                 # 미래 가격이 오르면 주식을 사지 않은 것에 대한 패널티
                 if future_max_price > price:
-                    future_return = -((future_max_price - price) / price) * 200  # 매수 기회를 놓친 것에 대한 패널티
+                    future_return = -((future_max_price - price) / price) * 3  # 매수 기회를 놓친 것에 대한 패널티
                 # 미래 가격이 떨어지면 주식을 사지 않은 것에 대한 보상
                 else:
-                    future_return = ((price - future_min_price) / price) * 100  # 하락을 피한 것에 대한 보상
+                    future_return = ((price - future_min_price) / price) * 1.2  # 하락을 피한 것에 대한 보상
                 
-        future_reward = future_return * 300  # 수익률 기반 보상
+        future_reward = future_return * 1.5  # 수익률 기반 보상
 
         # ✅ 최종 보상 (각 보상 요소를 합산)
         reward = short_term_reward + long_term_reward + holding_reward + future_reward + reward
@@ -164,7 +174,7 @@ class StockTradingEnv(gym.Env):
 
         # log_manager.logger.debug(f"Step: {self.current_step}, Action: {['Sell', 'Hold', 'Buy'][action]}, Reward: {reward}, Portfolio: {new_portfolio_value}, Shares Held: {self.shares_held}")
 
-        return next_state, reward, done
+        return next_state_with_shares, reward, done
 
 if __name__ == "__main__":
     stock_data = np.random.randn(60, 5)

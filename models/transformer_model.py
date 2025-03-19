@@ -58,11 +58,12 @@ class StockTransformer(nn.Module):
         if input_dim is None:
             input_dim = config_manager.get_input_dim()
 
+        self.input_dim = input_dim + 1  # 🔹 보유 주식 수(`shares_held`) 추가
         self.positional_encoding = PositionalEncoding(model_dim).to(self.device)
         self.layer_norm = nn.LayerNorm(model_dim).to(self.device)  # 추가
 
         # 입력 데이터를 Transformer 입력 차원으로 변환
-        self.embedding = nn.Linear(input_dim, model_dim).to(self.device)
+        self.embedding = nn.Linear(self.input_dim, model_dim).to(self.device)
 
         # Transformer 인코더 레이어 설정 (batch_first=True 옵션 추가)
         encoder_layer = nn.TransformerEncoderLayer(d_model=model_dim, nhead=num_heads, batch_first=True).to(self.device)
