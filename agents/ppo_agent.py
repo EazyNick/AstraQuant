@@ -46,13 +46,20 @@ class PPOAgent:
 
     def select_action(self, state):
         """현재 상태에서 확률적으로 액션을 선택"""
-        state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(self.device)  # (1, seq_len, feature_dim)
+        state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(self.device)  # (1, seq_len, feature_dim+1) ← shares_held 추가
 
         if not torch.isfinite(state).all():
             print("⚠️ Invalid state detected:", state)
         
         logits = self.model(state)  # 모델의 원시 출력
-        print(f"Raw logits: {logits}")
+        # ✅ 액션별 logits 값 할당
+        sell_logit, hold_logit, buy_logit = logits[0].tolist()  # Tensor를 리스트로 변환하여 값 추출
+
+        if self.train_step % 100 == 0:
+            log_manager.logger.debug(
+                f"{self.train_step} step Raw logits → "
+                f"Sell: {sell_logit:.4f}, Hold: {hold_logit:.4f}, Buy: {buy_logit:.4f}"
+            )
         # 🔍 모델 출력(logits)의 유효성 검사
         if not torch.isfinite(logits).all():
             print("⚠️ Invalid logits detected:", logits)
