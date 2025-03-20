@@ -19,6 +19,10 @@ def load_stock_data(file_path):
     # ✅ NaN 값 처리
     df.fillna(0, inplace=True)
 
+    # ✅ 빈값이 있는 열 제거
+    df = df.dropna(axis=1, how='any')  # 한 행이라도 빈값이 있으면 해당 열 삭제
+    df = df.loc[:, (df != 0).all(axis=0)]  # 한 행이라도 0값이 있으면 해당 열 삭제
+
     # ✅ Boolean 값을 0과 1로 변환
     # True/False 변환 후, 숫자형 데이터만 float으로 변환
     df = df.replace({True: 1000.0, False: 0.0})
@@ -33,7 +37,11 @@ def load_stock_data(file_path):
     # df[df.select_dtypes(include=[np.number]).columns] = df.select_dtypes(include=[np.number])
 
     # ✅ 이동평균선 제외, 기울기(Slope) 및 가격(Close)만 포함
-    selected_columns = [col for col in df.columns if "Slope" in col or "Close" in col]
+    # selected_columns = [col for col in df.columns if "Slope" in col or "Close" in col]
+
+    # ✅ 이동평균선 제외, 기울기(Slope) 및 가격(Close)만 포함 (단, vma 관련 컬럼 제외)
+    selected_columns = [col for col in df.columns if ("Slope" in col or "Close" in col) and "vma" not in col.lower()]
+    selected_columns = list(set(selected_columns) & set(df.columns))  # 존재하는 컬럼만 선택
 
     # ✅ 선택된 칼럼명을 저장
     selected_feature_names = df[selected_columns].columns.tolist()
@@ -49,6 +57,10 @@ def load_stock_data(file_path):
 
     # # `tanh` 변환 적용 (Slope 값만)
     # df[slope_columns] = np.tanh(df[slope_columns])
+
+    # ✅ 최종 선택된 열 출력
+    print("📊 최종 변환된 데이터 열 및 샘플 데이터:")
+    print(df.head())  # 데이터 일부 출력
 
     # ✅ Numpy 배열로 변환
     data = df.values
