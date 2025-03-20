@@ -81,7 +81,7 @@ class StockTradingEnv(gym.Env):
                 self.shares_held += shares_to_buy
                 self.balance -= cost
             else:
-                reward -= 10 * self.shares_held  # 매수를 원했지만 실패한 경우 패널티 추가
+                reward -= self.shares_held  # 매수를 원했지만 실패한 경우 패널티 추가
 
         elif action == 0:
             if self.shares_held > 0: # 매도 (Sell)
@@ -89,7 +89,7 @@ class StockTradingEnv(gym.Env):
                 self.balance += revenue
                 self.shares_held = 0  # 전량 매도
             else:
-                reward -= -11 * self.shares_held  # 매도를 원했지만 실패한 경우 패널티 추가
+                reward -= self.shares_held  # 매도를 원했지만 실패한 경우 패널티 추가
         
         self.current_step += 1
         done = self.current_step >= len(self.stock_data) - self.observation_window
