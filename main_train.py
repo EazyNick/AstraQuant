@@ -36,12 +36,13 @@ log_manager.logger.info(f"✅ 학습 장치 설정: {device}")
 
 # ✅ 데이터 로드 (input_dim 자동 추출)
 log_manager.logger.info("데이터 불러오기...")
-stock_prices, input_dim = load_stock_data("data/csv/GSPC_combined_train_data.csv")
-log_manager.logger.info(f"입력 피처 개수: {input_dim}")
+stock_prices, input_dim = load_stock_data("data/csv/005930.KS_combined_train_data.csv")
 
 # ✅ 환경 및 모델 생성 (config.yaml에서 설정값 자동 적용)
 env = StockTradingEnv(stock_prices)
 model = StockTransformer(input_dim=input_dim).to(device)  # ✅ 모델을 GPU/CPU로 이동
+# ✅ 정확한 입력 피처 개수 로그 출력 (보유 주식 수 포함된 input_dim)
+log_manager.logger.info(f"📐 모델 입력 피처 개수 (보유 수량 포함): {model.input_dim}")
 agent = PPOAgent(model)
 
 training_manager = TrainingManager()

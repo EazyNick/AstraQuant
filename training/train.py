@@ -105,6 +105,12 @@ class TrainingManager:
             model.load_state_dict(checkpoint['model_state_dict'], strict=False)
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             episode = checkpoint['episode']
+
+            # ✅ input_dim 로깅 추가
+            if hasattr(model, 'input_dim'):
+                log_manager.logger.info(f"📐 모델 input_dim: {model.input_dim}")
+            else:
+                log_manager.logger.warning("⚠️ model.input_dim 속성이 존재하지 않습니다.")
             log_manager.logger.info(f"✅ 체크포인트 로드 완료: {self.checkpoint_path} (Episode {episode})")
             return episode
         else:
