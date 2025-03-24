@@ -71,10 +71,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     device = torch.device(config_manager.get_device())
+    # ✅ 초기 보유 수량
+    holding = 0
 
     # ✅ 저장된 모델 로드 
-    stock_data, input_dim = load_stock_data(args.test_data or 'data/csv/sp500_test_data.csv')
-    model = load_model(args.model_path or os.path.join(os.path.dirname(__file__), 'output', 'ppo_stock_trader_episode_296.pth'), StockTransformer, input_dim, device)
+    stock_data, input_dim = load_stock_data(args.test_data)
+    model = load_model(args.model_path, StockTransformer, input_dim, device)
+    # if model is None:
+    #     raise ValueError("모델이 로드되지 않았습니다.")
 
     df = pd.read_csv(args.test_data or 'data/csv/sp500_test_data.csv')
     dates = df['Date'].values # ✅ 날짜 데이터 저장
@@ -90,9 +94,18 @@ if __name__ == "__main__":
 
     for i in range(observation_window, stock_data.shape[0]):
         state = stock_data[i - observation_window:i] # 관찰 윈도우 데이터 추출
+        # ✅ 각 시점에 보유 수량을 붙임 (마지막 컬럼으로 추가)
+        holding_column = np.full((observation_window, 1), holding, dtype=np.float32)
+        state_with_holding = np.concatenate([state, holding_column], axis=1)
         date = dates[i] # 해당 날짜 가져오기
-        action, probs = predict_action(model, state, device)
+        action, probs = predict_action(model, state_with_holding, device)
         predictions.append([date, action_dict[action], probs[0]])
+
+        # ✅ 보유 수량 업데이트
+        if action == 2:  # 매수
+            holding += 8000
+        elif action == 0 and holding > 0:  # 매도
+            holding -= 8000
 
     # ✅ 데이터프레임으로 변환 및 출력
     # ✅ 모든 행을 출력하도록 설정 변경
@@ -110,4 +123,4 @@ if __name__ == "__main__":
     log_manager.logger.info(summary)
 
     # 예시 명령어
-    # python main_predict.py --model_path output/ppo_stock_trader_episode_470.pth --test_data data/csv/GSPC_combined_test_data.csv
+    # python main_predict.py --model_path output/ppo_stock_trader_episode_150.pth --test_data data/csv/GSPC_combined_test_data.csv

@@ -19,10 +19,6 @@ def load_stock_data(file_path):
     # ✅ NaN 값 처리
     df.fillna(0, inplace=True)
 
-    # ✅ 빈값이 있는 열 제거
-    df = df.dropna(axis=1, how='any')  # 한 행이라도 빈값이 있으면 해당 열 삭제
-    df = df.loc[:, (df != 0).all(axis=0)]  # 한 행이라도 0값이 있으면 해당 열 삭제
-
     # ✅ Boolean 값을 0과 1로 변환
     # True/False 변환 후, 숫자형 데이터만 float으로 변환
     df = df.replace({True: 1000.0, False: 0.0})
@@ -43,20 +39,27 @@ def load_stock_data(file_path):
     selected_columns = [col for col in df.columns if ("Slope" in col or "Close" in col) and "vma" not in col.lower()]
     selected_columns = list(set(selected_columns) & set(df.columns))  # 존재하는 컬럼만 선택
 
-    # ✅ 선택된 칼럼명을 저장
-    selected_feature_names = df[selected_columns].columns.tolist()
-    print(f"📌 선택된 피처: {selected_feature_names}")
+    # ✅ 선택된 피처 출력
+    print(f"📌 선택된 피처: {selected_columns}")
 
-    # ✅ 날짜(Date) 컬럼 제외하고 데이터 변환
+    # ✅ 먼저 선택된 컬럼만 추출
     df = df[selected_columns]
 
+    # ✅ 0이 하나라도 있는 열 제거
+    before_columns = df.columns.tolist()
+    df = df.loc[(df != 0).all(axis=1)]  # ✅ 0이 있는 "행" 제거
+    after_columns = df.columns.tolist()
+
+    # ✅ 제거된 컬럼 확인
+    removed_columns = list(set(before_columns) - set(after_columns))
+    if removed_columns:
+        print(f"🗑️ 제거된 컬럼 ({len(removed_columns)}개): {removed_columns}")
+    else:
+        print("✅ 모든 선택된 컬럼이 유지되었습니다.")
 
     # # ✅ Slope 값에만 Tanh 변환 적용
     # slope_columns = [col for col in df.columns if "Slope" in col]
     # # print(f"🎯 Tanh 변환 적용 열: {slope_columns}")  # 변환 대상 열 확인용 로그
-
-    # # `tanh` 변환 적용 (Slope 값만)
-    # df[slope_columns] = np.tanh(df[slope_columns])
 
     # ✅ 최종 선택된 열 출력
     print("📊 최종 변환된 데이터 열 및 샘플 데이터:")
@@ -68,6 +71,9 @@ def load_stock_data(file_path):
     # ✅ 입력 피처 개수 반환
     input_dim = data.shape[1]
 
+    # ✅ 최종 피처 개수 출력
+    print(f"📐 데이터에서 걸러진 피처 개수: {input_dim}개")
+
     return data, input_dim
 
 # ✅ 테스트 코드 추가
@@ -75,7 +81,7 @@ if __name__ == "__main__":
     import os
 
     # ✅ 샘플 CSV 파일 경로 설정
-    sample_file = "data/csv/GSPC_combined_test_data.csv"
+    sample_file = "data/csv/005930.KS_combined_train_data.csv"
 
     # ✅ 파일이 존재하는지 확인 후 로드
     if os.path.exists(sample_file):

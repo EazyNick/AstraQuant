@@ -146,16 +146,16 @@ class StockTradingEnv(gym.Env):
                 if future_max_price > price:  # 가격이 오를 경우 큰 보상
                     future_return = ((future_max_price - price) / price) * self.shares_held * 1.2  # 가격 상승 보상
                 else:  # 가격이 떨어지거나 그대로인 경우 패널티
-                    future_return = ((future_min_price - price) / price) * self.shares_held * 3  # 패널티는 더 크게 (음수값)
+                    future_return = ((future_min_price - price) / price) * self.shares_held * 4  # 패널티는 더 크게 (음수값)
             else:  # 주식을 보유하지 않은 상태라면
                 # 미래 가격이 오르면 주식을 사지 않은 것에 대한 패널티
                 if future_max_price > price:
-                    future_return = -((future_max_price - price) / price) * 3  # 매수 기회를 놓친 것에 대한 패널티
+                    future_return = -((future_max_price - price) / price) * 4  # 매수 기회를 놓친 것에 대한 패널티
                 # 미래 가격이 떨어지면 주식을 사지 않은 것에 대한 보상
                 else:
                     future_return = ((price - future_min_price) / price) * 1.2  # 하락을 피한 것에 대한 보상
                 
-        future_reward = future_return * 1.5  # 수익률 기반 보상
+        future_reward = future_return * 1.1  # 수익률 기반 보상
 
         # ✅ 최종 보상 (각 보상 요소를 합산)
         reward = short_term_reward + long_term_reward + holding_reward + future_reward + reward
