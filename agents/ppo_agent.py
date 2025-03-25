@@ -35,10 +35,11 @@ class PPOAgent:
         self.optimizer = optim.Adam(self.model.parameters(), lr=config_manager.get_learning_rate()) # Adam Optimizer 설정
         self.gamma = config_manager.get_gamma() # 할인율(γ)
         self.clampepsilon = config_manager.get_clampepsilon() # PPO 클리핑 파라미터(ε)
-        self.epsilon_min = 0.01  
-        self.epsilon_decay = 0.999
         self.batch_size = config_manager.get_batch_size() # 배치 크기
         self.criterion = nn.MSELoss() # 손실 함수 설정
+        self.epsilon = config_manager.get_epsilon()
+        self.epsilon_min = config_manager.get_epsilon_min()
+        self.epsilon_decay = config_manager.get_epsilon_decay()
 
         # ✅ TensorBoard 설정
         self.writer = SummaryWriter(log_dir="logs/ppo_training")
@@ -51,6 +52,7 @@ class PPOAgent:
         if not torch.isfinite(state).all():
             print("⚠️ Invalid state detected:", state)
         
+        # logits는 모델의 마지막 출력층에서 나온 가공되지 않은 값들
         logits = self.model(state)  # 모델의 원시 출력
         # ✅ 액션별 logits 값 할당
         sell_logit, hold_logit, buy_logit = logits[0].tolist()  # Tensor를 리스트로 변환하여 값 추출
@@ -64,7 +66,20 @@ class PPOAgent:
         if not torch.isfinite(logits).all():
             print("⚠️ Invalid logits detected:", logits)
 
+        # probability(확률)
         probs = torch.softmax(logits, dim=-1) # 현재 상태(state)를 StockTransformer 모델에 입력, probs = 확률 분포 πθ(a|s)
+        
+        if random.random() < self.epsilon:
+            action = random.choice([0, 1, 2])
+            log_prob = torch.log(torch.tensor(1 / 3.0, dtype=torch.float32)).to(self.device)  # uniform prob
+            action_names = ["매도", "관망", "매수"]
+            log_manager.logger.debug(f"[탐험] 랜덤 액션 선택: {action} ({action_names[action]}) (입실론={self.epsilon:.4f})")
+        else:
+            dist = torch.distributions.Categorical(probs)
+            action = dist.sample().item()
+            log_prob = dist.log_prob(torch.tensor(action).to(self.device))
+
+        self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
 
         # ✅ TensorBoard에 action 확률 기록
         self.writer.add_scalars("Action Probabilities", {
@@ -78,17 +93,17 @@ class PPOAgent:
             print("⚠️ Invalid probability tensor detected:", probs)
             return random.choice([0, 1, 2])  # 문제가 발생하면 랜덤 액션 반환
 
-        action = torch.multinomial(probs, 1).item() # 확률 기반 액션 샘플링
         self.train_step += 1  # 학습 스텝 증가
 
-        return action
+        return action, log_prob.item()
 
     def update(self, memory):
         """PPO 알고리즘을 이용한 정책 업데이트"""
-        states, actions, rewards = zip(*memory)
+        states, actions, rewards, old_log_probs = zip(*memory)
         states = torch.tensor(np.array(states), dtype=torch.float32).to(self.device)
         actions = torch.tensor(actions, dtype=torch.int64).to(self.device)
         rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
+        old_log_probs = torch.tensor(old_log_probs, dtype=torch.float32).to(self.device)
 
         # ✅ 1. Discounted Reward 계산 (Advantage Estimation)
         discounted_rewards = [] # Advantage Estimation
@@ -102,17 +117,17 @@ class PPOAgent:
             batch_states = states[i:i+self.batch_size]
             batch_actions = actions[i:i+self.batch_size]
             batch_rewards = discounted_rewards[i:i+self.batch_size]
+            batch_old_log_probs = old_log_probs[i:i+self.batch_size]
 
             # ✅ 2. 새로운 정책(`π_new`)의 확률 계산
             probs = torch.softmax(self.model(batch_states), dim=-1)
-            action_probs = probs.gather(1, batch_actions.unsqueeze(1)).squeeze()
-            # detach()는 PyTorch 텐서의 연산 그래프(autograd)에서 분리하여, 역전파(gradient 계산)에 포함되지 않도록 하는 함수
-            old_probs = action_probs.detach() # 이전 정책(`π_old`) 확률 저장
+            # action_probs = probs.gather(1, batch_actions.unsqueeze(1)).squeeze()
+            dist = torch.distributions.Categorical(probs)
+            new_log_probs = dist.log_prob(batch_actions)
 
             # ✅ 3. PPO Clipped Objective 계산
-            # old_probs가 0이 되지 않도록 작은 epsilon을 추가
-            epsilon = 1e-8
-            ratio = action_probs / (old_probs + epsilon) # 확률 비율(`π_new / π_old`) 계산
+            # PPO Clipped Objective 계산
+            ratio = torch.exp(new_log_probs - batch_old_log_probs) # 확률 비율(`π_new / π_old`) 계산
             # ratio의 유효성 검사
             if not torch.isfinite(ratio).all():
                 print("⚠️ Invalid ratio detected:", ratio)
