@@ -46,6 +46,7 @@ class TrainingManager:
             self.checkpoint_filename = checkpoint_filename
             self.save_path = os.path.join(self.directory, self.filename)
             self.checkpoint_path = os.path.join(self.directory, self.checkpoint_filename)
+            self.epsilon = config_manager.get_epsilon()
             log_manager.logger.debug(f"✅ 모델 저장 경로: {self.save_path}")
 
             os.makedirs(self.directory, exist_ok=True)  # 폴더가 없으면 자동 생성
@@ -84,12 +85,13 @@ class TrainingManager:
         checkpoint = {
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
-            'episode': episode
+            'episode': episode,
+            'epsilon': self.epsilon
         }
         torch.save(checkpoint, self.checkpoint_path)
-        log_manager.logger.info(f"✅ 체크포인트 저장 완료: {self.checkpoint_path} (Episode {episode})")
+        log_manager.logger.info(f"✅ 체크포인트 저장 완료: {self.checkpoint_path} (Episode {episode}, epsilon: {self.epsilon:.6f})")
 
-    def load_checkpoint(self, model, optimizer):
+    def load_checkpoint(self, model, optimizer, agent=None):
         """
         체크포인트를 로드하는 함수
 
@@ -105,6 +107,10 @@ class TrainingManager:
             model.load_state_dict(checkpoint['model_state_dict'], strict=False)
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             episode = checkpoint['episode']
+            self.epsilon = checkpoint.get('epsilon', self.epsilon)
+
+            if agent is not None:
+                agent.epsilon = self.epsilon  # ✅ PPOAgent의 epsilon도 업데이트
 
             # ✅ input_dim 로깅 추가
             if hasattr(model, 'input_dim'):
@@ -122,7 +128,7 @@ def train_agent(env, agent, episodes, training_manager):
     log_manager.logger.info(f"🎯 학습 시작")
 
     # 체크포인트 로드 (이전 학습 기록이 있으면 이어서 시작)
-    start_episode = training_manager.load_checkpoint(agent.model, agent.optimizer)
+    start_episode = training_manager.load_checkpoint(agent.model, agent.optimizer, agent)
     best_reward = float('-inf')  # 최고 리워드 기록 초기화
 
     for episode in range(start_episode, episodes):
@@ -136,9 +142,9 @@ def train_agent(env, agent, episodes, training_manager):
             # current_price = env.stock_data[env.current_step, 0]
 
             # ✅ PPOAgent에게 환경 정보를 전달하여 액션 선택
-            action = agent.select_action(state)
+            action, log_prob = agent.select_action(state)
             next_state, reward, done = env.step(action)
-            memory.append((state, action, reward))  # 메모리에 실제 액션 저장
+            memory.append((state, action, reward, log_prob))  # 메모리에 실제 액션 저장
             state = next_state
             total_reward += reward
 

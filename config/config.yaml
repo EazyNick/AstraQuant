@@ -12,6 +12,9 @@ env:
 training:
   episodes: 10000       # 학습 에피소드 수
   batch_size: 12          # 배치 크기
+  epsilon: 0.5          # 시작 입실론
+  epsilon_min: 0.01     # 최소 입실론
+  epsilon_decay: 0.995  # 매 스텝마다 곱해질 감쇠율
   learning_rate: 0.0005   # 학습률
   gamma: 0.99             # 할인율 (future reward 반영 비율)
   clampepsilon: 0.2            # PPO 클리핑 파라미터

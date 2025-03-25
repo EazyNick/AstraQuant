@@ -79,7 +79,6 @@ class ConfigManager:
     def get_observation_window(self):
         return self.config["env"]["observation_window"]
     
-
     def get_transaction_fee(self):
         return self.config["env"].get("transaction_fee", 0.001)  # 기본값 설정
 
@@ -91,6 +90,15 @@ class ConfigManager:
 
     def get_batch_size(self):
         return self.config["training"]["batch_size"]
+    
+    def get_epsilon(self):
+        return self.config["training"].get("epsilon", 1.0)
+    
+    def get_epsilon_min(self):
+        return self.config["training"].get("epsilon_min", 0.01)
+
+    def get_epsilon_decay(self):
+        return self.config["training"].get("epsilon_decay", 0.999)
 
     def get_learning_rate(self):
         return self.config["training"]["learning_rate"]
@@ -136,6 +144,16 @@ class ConfigManager:
 
     def set_batch_size(self, value):
         self.config["training"]["batch_size"] = value
+
+    def set_epsilon(self, value):
+        self.config["training"]["epsilon"] = value
+
+    def set_epsilon_min(self, value):
+        self.config["training"]["epsilon_min"] = value
+
+    def set_epsilon_decay(self, value):
+        self.config["training"]["epsilon_decay"] = value
+
 
     def set_learning_rate(self, value):
         self.config["training"]["learning_rate"] = value
