@@ -123,4 +123,4 @@ if __name__ == "__main__":
     log_manager.logger.info(summary)
 
     # 예시 명령어
-    # python main_predict.py --model_path output/ppo_stock_trader_episode_150.pth --test_data data/csv/GSPC_combined_test_data.csv
+    # python main_predict.py --model_path output/ppo_stock_trader_episode_147.pth --test_data data/csv/GSPC_combined_test_data.csv

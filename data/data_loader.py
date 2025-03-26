@@ -35,9 +35,12 @@ def load_stock_data(file_path):
     # ✅ 이동평균선 제외, 기울기(Slope) 및 가격(Close)만 포함
     # selected_columns = [col for col in df.columns if "Slope" in col or "Close" in col]
 
-    # ✅ 이동평균선 제외, 기울기(Slope) 및 가격(Close)만 포함 (단, vma 관련 컬럼 제외)
-    selected_columns = [col for col in df.columns if ("Slope" in col or "Close" in col) and "vma" not in col.lower()]
-    selected_columns = list(set(selected_columns) & set(df.columns))  # 존재하는 컬럼만 선택
+    # ✅ 컬럼 이름 사전 정의
+    preferred_order = [col for col in df.columns if "Close" in col and col not in ["W_Close", "M_Close"]] + \
+                  [col for col in df.columns if "Slope" in col and "vma" not in col.lower()]
+
+    # ✅ 교집합 유지하며 순서 보장
+    selected_columns = [col for col in preferred_order if col in df.columns]
 
     # ✅ 선택된 피처 출력
     print(f"📌 선택된 피처: {selected_columns}")
