@@ -72,6 +72,7 @@ class StockTradingEnv(gym.Env):
         """ 액션을 실행하고 새로운 상태, 보상, 종료 여부 반환 """
         reward = 0
         price = self.stock_data[self.current_step, 0]
+        print(price)
 
         if action == 2:  # 매수 (Buy)
             shares_to_buy = self.balance / (price * (1 + self.transaction_fee)) # 살 수 있는 최대 주식 수
