@@ -5,7 +5,7 @@ import numpy as np
 import random
 import os
 import sys
-from tensorboardX import SummaryWriter  # TensorBoard
+from torch.utils.tensorboard import SummaryWriter
 
 current_file = os.path.abspath(__file__) 
 project_root = os.path.abspath(os.path.join(current_file, "..", "..")) # 현재 디렉토리에 따라 이 부분 수정
@@ -68,17 +68,18 @@ class PPOAgent:
 
         # probability(확률)
         probs = torch.softmax(logits, dim=-1) # 현재 상태(state)를 StockTransformer 모델에 입력, probs = 확률 분포 πθ(a|s)
-        
+        dist = torch.distributions.Categorical(probs)
+
         if random.random() < self.epsilon:
             action = random.choice([0, 1, 2])
-            log_prob = torch.log(torch.tensor(1 / 3.0, dtype=torch.float32)).to(self.device)  # uniform prob
+            log_prob = dist.log_prob(torch.tensor(action).to(self.device))  # ✅ 신경망 기반 log_prob
             action_names = ["매도", "관망", "매수"]
             log_manager.logger.debug(f"[탐험] 랜덤 액션 선택: {action} ({action_names[action]}) (입실론={self.epsilon:.4f})")
         else:
-            dist = torch.distributions.Categorical(probs)
             action = dist.sample().item()
             log_prob = dist.log_prob(torch.tensor(action).to(self.device))
 
+        log_manager.logger.debug(f"action: {action}, log_prob: {log_prob.item():.4f}")
         self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
 
         # ✅ TensorBoard에 action 확률 기록
