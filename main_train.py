@@ -46,7 +46,7 @@ env = StockTradingEnv(stock_prices, writer=writer)
 model = StockTransformer(input_dim=input_dim).to(device)  # ✅ 모델을 GPU/CPU로 이동
 # ✅ 정확한 입력 피처 개수 로그 출력 (보유 주식 수 포함된 input_dim)
 log_manager.logger.info(f"📐 모델 입력 피처 개수 (보유 수량 포함): {model.input_dim}")
-agent = PPOAgent(model)
+agent = PPOAgent(model, writer=writer)
 
 training_manager = TrainingManager()
 # ✅ 학습 시작

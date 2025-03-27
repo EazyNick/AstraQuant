@@ -29,7 +29,7 @@ except Exception as e:
 class PPOAgent:
     """PPO(Proximal Policy Optimization) 에이전트"""
 
-    def __init__(self, model):
+    def __init__(self, model, writer=None):
         self.device = torch.device(config_manager.get_device())  # device 설정
         self.model = model.to(self.device)  # 모델을 GPU/CPU로 이동
         self.optimizer = optim.Adam(self.model.parameters(), lr=config_manager.get_learning_rate()) # Adam Optimizer 설정
@@ -42,7 +42,7 @@ class PPOAgent:
         self.epsilon_decay = config_manager.get_epsilon_decay()
 
         # ✅ TensorBoard 설정
-        self.writer = SummaryWriter(log_dir="logs/ppo_training")
+        self.writer = writer 
         self.train_step = 0  # 학습 스텝 카운트
 
     def select_action(self, state):
@@ -73,14 +73,16 @@ class PPOAgent:
         if random.random() < self.epsilon:
             action = random.choice([0, 1, 2])
             log_prob = dist.log_prob(torch.tensor(action).to(self.device))  # ✅ 신경망 기반 log_prob
-            action_names = ["매도", "관망", "매수"]
-            log_manager.logger.debug(f"[탐험] 랜덤 액션 선택: {action} ({action_names[action]}) (입실론={self.epsilon:.4f})")
+            # action_names = ["매도", "관망", "매수"]
+            # log_manager.logger.debug(f"[탐험] 랜덤 액션 선택: {action} ({action_names[action]}) (입실론={self.epsilon:.4f})")
         else:
             action = dist.sample().item()
             log_prob = dist.log_prob(torch.tensor(action).to(self.device))
 
-        log_manager.logger.debug(f"action: {action}, log_prob: {log_prob.item():.4f}")
+        # log_manager.logger.debug(f"action: {action}, log_prob: {log_prob.item():.4f}")
         self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
+
+        # print(f"📝 Logging at step {self.train_step}: Sell={probs[0,0].item():.4f}, Hold={probs[0,1].item():.4f}, Buy={probs[0,2].item():.4f}")
 
         # ✅ TensorBoard에 action 확률 기록
         self.writer.add_scalars("Action Probabilities", {
@@ -129,6 +131,11 @@ class PPOAgent:
             # ✅ 3. PPO Clipped Objective 계산
             # PPO Clipped Objective 계산
             ratio = torch.exp(new_log_probs - batch_old_log_probs) # 확률 비율(`π_new / π_old`) 계산
+
+            # 🔍 확률 비율이 너무 크거나 작은 경우 확인
+            if (ratio > 10).any() or (ratio < 0.1).any():
+                print(f"⚠️ 이상한 ratio 값 감지! min: {ratio.min().item()}, max: {ratio.max().item()}")
+
             # ratio의 유효성 검사
             if not torch.isfinite(ratio).all():
                 print("⚠️ Invalid ratio detected:", ratio)
@@ -136,8 +143,12 @@ class PPOAgent:
             clipped_ratio = torch.clamp(ratio, 1 - self.clampepsilon, 1 + self.clampepsilon) # 확률 비율이 너무 커지지 않도록 클리핑(ε=0.2) 적용
             loss = -torch.min(ratio * batch_rewards, clipped_ratio * batch_rewards).mean() # 손실 함수
 
-            # ✅ TensorBoard에 손실 값 기록
-            self.writer.add_scalar("Loss", loss.item(), self.train_step)
+            # ✅ TensorBoard 기록 추가
+            if self.writer:
+                self.writer.add_scalar("Loss", loss.item(), self.train_step)
+                self.writer.add_scalar("PPO Ratio Mean", ratio.mean().item(), self.train_step)  # 확률 비율 기록
+                self.writer.add_scalar("PPO Clipped Ratio Mean", clipped_ratio.mean().item(), self.train_step)  # 클리핑 비율 기록
+                self.writer.add_scalar("Batch Reward Mean", batch_rewards.mean().item(), self.train_step)  # 보상 평균 기록
 
             # ✅ 4. 모델 업데이트
             self.optimizer.zero_grad()
