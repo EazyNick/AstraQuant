@@ -31,7 +31,7 @@ except Exception as e:
 class StockTradingEnv(gym.Env):
     def __init__(self, stock_data, writer=None):
         super(StockTradingEnv, self).__init__()
-        self.writer = writer or SummaryWriter(log_dir="logs/trading_env")
+        self.writer = writer
         self.device = config_manager.get_device()
         self.initial_balance = config_manager.get_initial_balance()
         self.observation_window = config_manager.get_observation_window()
@@ -49,8 +49,6 @@ class StockTradingEnv(gym.Env):
         # ✅ TensorBoard 추가
         self.train_step = 0  # 학습 스텝 카운트
         self.total_reward = 0  # 최종 보상 추적용 변수
-        self.writer = SummaryWriter(log_dir="logs/trading_env")
-        
 
     def normalize_reward(self, value, scale=50000):
         value = torch.tensor(value, dtype=torch.float32).to(self.device)
@@ -75,6 +73,9 @@ class StockTradingEnv(gym.Env):
         """ 액션을 실행하고 새로운 상태, 보상, 종료 여부 반환 """
         reward = 0
         price = self.stock_data[self.current_step, 0]
+        if np.isnan(price) or price <= 0:
+            log_manager.logger.warning(f"[Step {self.current_step}] 경고: 유효하지 않은 가격 {price}.")
+            return None, 0, True  # 가격이 NaN이면 종료
 
         if action == 2:  # 매수 (Buy)
             shares_to_buy = self.balance / (price * (1 + self.transaction_fee)) # 살 수 있는 최대 주식 수
@@ -98,8 +99,16 @@ class StockTradingEnv(gym.Env):
         done = self.current_step >= len(self.stock_data) - self.observation_window
         next_state = self.stock_data[self.current_step:self.current_step + self.observation_window]
 
-        # 🔹 보유 주식수 feature 추가
-        shares_held_feature = np.full((self.observation_window, 1), self.shares_held)
+        # 보유 주식 수 히스토리를 저장하는 배열 추가
+        if not hasattr(self, "shares_held_history"):
+            self.shares_held_history = np.zeros(self.observation_window)
+
+        # 가장 오래된 값을 제거하고, 새로운 보유 주식 수 추가
+        self.shares_held_history = np.roll(self.shares_held_history, shift=-1)
+        self.shares_held_history[-1] = self.shares_held  # 최신 보유 주식 수 업데이트
+
+        # 과거 보유 주식 수 기록을 상태와 함께 결합
+        shares_held_feature = self.shares_held_history.reshape(-1, 1)  # (observation_window, 1)
         next_state_with_shares = np.hstack((next_state, shares_held_feature))
 
         # 새로운 포트폴리오 가치 계산
@@ -117,7 +126,7 @@ class StockTradingEnv(gym.Env):
             short_term_reward = 0
 
         # 장기적 보상을 반영하도록 강화 (현재 가치 대비 초기 가치)
-        long_term_reward = ((new_portfolio_value - self.initial_balance) / self.initial_balance) * 100 * 3
+        long_term_reward = ((new_portfolio_value - self.initial_balance) / self.initial_balance) * 100 * 5
 
         # # 보유 주식 가격 상승 시 추가 보상
         # if self.shares_held > 0 and self.current_step > 0:
@@ -126,8 +135,8 @@ class StockTradingEnv(gym.Env):
         #     holding_reward = 0
 
         # 18일 후의 `Buy & Hold` 수익률 계산
-        future_step = min(self.current_step + 18, len(self.stock_data) - 1)
-        # 현재 스텝을 제외한 18일 이내의 최고가 & 최저가 찾기
+        future_step = min(self.current_step + 10, len(self.stock_data) - 1)
+        # 현재 스텝을 제외한 5일 이내의 최고가 & 최저가 찾기
         future_max_price = np.max(self.stock_data[self.current_step + 1:future_step + 1, 0])
         future_min_price = np.min(self.stock_data[self.current_step + 1:future_step + 1, 0])
         
@@ -143,7 +152,7 @@ class StockTradingEnv(gym.Env):
             else:  # 미래 최저가가 현재 가격보다 낮으면 기존 방식 유지
                 future_return = ((price - future_min_price) / price) * self.shares_held * 1.5
 
-        elif action == 1:  # 관망(Hold)
+        else:  # 관망(Hold)
             if self.shares_held > 0:  # 주식을 보유 중이라면
                 # 미래 최고가와 현재 가격 비교
                 if future_max_price > price:  # 가격이 오를 경우 큰 보상
@@ -158,17 +167,29 @@ class StockTradingEnv(gym.Env):
                 else:
                     future_return = ((price - future_min_price) / price) * 1.2  # 하락을 피한 것에 대한 보상
                 
-        future_reward = future_return * 1  # 수익률 기반 보상
+        future_reward = future_return * 5.5  # 수익률 기반 보상
 
         # ✅ 최종 보상 (각 보상 요소를 합산)
         reward = short_term_reward + long_term_reward + holding_reward + future_reward + reward
         self.total_reward += reward  # ✅ 누적 보상 업데이트
 
+        # # 🔹 **액션 로그 및 상태 변화 확인**
+        # log_manager.logger.debug(
+        #     f"[Step {self.current_step}] Action: {['Sell', 'Hold', 'Buy'][action]}, Price: {price:.2f}, "
+        #     f"Prev Balance: {previous_portfolio_value:.2f} → {self.balance:.2f}, "
+        #     f"Prev Shares: {previous_shares_held} → {self.shares_held}, "
+        #     f"Portfolio: {self.previous_portfolio_value:.2f} → {new_portfolio_value:.2f}, "
+        #     f"Reward: {reward:.4f}"
+        # )
+
         self.train_step += 1  # 학습 스텝 증가 
         # ✅ TensorBoard 기록
         self.writer.add_scalar("Portfolio Value", new_portfolio_value, self.train_step)
         self.writer.add_scalar("Shares Held", self.shares_held, self.train_step)
-        self.writer.add_scalar("Reward/Total", self.total_reward, self.train_step)  # ✅ 최종 보상 기록
+        self.writer.add_scalar("Reward/Short-Term", short_term_reward, self.train_step)
+        self.writer.add_scalar("Reward/Long-Term", long_term_reward, self.train_step)
+        self.writer.add_scalar("Reward/Future", future_reward, self.train_step)
+        self.writer.add_scalar("Reward/Total", reward, self.train_step)
 
         # ✅ 보상 정규화 적용
         reward = self.normalize_reward(reward)

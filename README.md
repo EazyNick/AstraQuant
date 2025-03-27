@@ -36,6 +36,7 @@ pip install -r requirements.txt
 ```
 
 ---
+✅ Python 버전: 본 프로젝트는 Python 3.10.16 환경에서 실행됩니다.
 
 ### **2️⃣ 데이터 다운로드**
 
