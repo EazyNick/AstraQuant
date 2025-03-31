@@ -42,6 +42,10 @@ class PPOAgent:
         self.epsilon_decay = config_manager.get_epsilon_decay()
         self.max_shares_per_trade = config_manager.get_max_shares_per_trade()
         self.action_dim = 1 + 2 * self.max_shares_per_trade
+        self.temperature = 3.0
+        # temperature > 1 → 분포를 평평하게 (더 많은 탐험)
+        # temperature < 1 → 분포를 더 날카롭게 (결정적 행동 강화)
+        self.entropy_coef = 0.02  # ✅ 조정 가능
 
         # ✅ TensorBoard 설정
         self.writer = writer 
@@ -60,25 +64,37 @@ class PPOAgent:
         # logits 출력 검증 및 디버깅용 로그 (1D 텐서로 변환)
         logits_list = logits[0].tolist()
 
-        # 100 step마다 일부 액션 logits 출력 (예: 앞쪽 5개, 뒤쪽 5개)
+        # 100 step마다 일부 액션 logits 출력
         if self.train_step % 100 == 0:
-            sample_log = {
-                f"Action_{i}": f"{logits_list[i]:.4f}" for i in range(min(5, self.action_dim))
-            }
-            if self.action_dim > 10:
-                sample_log.update({
-                    f"Action_{self.action_dim - i - 1}": f"{logits_list[-i - 1]:.4f}" for i in range(5)
-                })
+            # 상위 10개 logits 값과 인덱스 추출
+            topk = sorted(enumerate(logits_list), key=lambda x: x[1], reverse=True)[:10]
+
+            topk_log = {}
+            for idx, val in topk:
+                if idx == 0:
+                    action_type = "관망"
+                    action_info = f"{action_type}"
+                elif 1 <= idx <= self.max_shares_per_trade:
+                    action_type = "매수"
+                    shares = idx  # 매수 수량
+                    action_info = f"{action_type}({shares}주)"
+                else:
+                    action_type = "매도"
+                    shares = idx - self.max_shares_per_trade  # 매도 수량
+                    action_info = f"{action_type}({shares}주)"
+
+                topk_log[f"Action_{idx}"] = f"{val:.4f} → {action_info}"
 
             log_manager.logger.debug(
-                f"{self.train_step} step Raw logits (샘플): {sample_log}"
+                f"{self.train_step} step Top-10 Raw logits:\n{topk_log}"
             )
+
         # 🔍 모델 출력(logits)의 유효성 검사
         if not torch.isfinite(logits).all():
             print("⚠️ Invalid logits detected:", logits)
 
         # probability(확률)
-        probs = torch.softmax(logits, dim=-1) # 현재 상태(state)를 StockTransformer 모델에 입력, probs = 확률 분포 πθ(a|s)
+        probs = torch.softmax(logits / self.temperature, dim=-1) # 현재 상태(state)를 StockTransformer 모델에 입력, probs = 확률 분포 πθ(a|s)
         dist = torch.distributions.Categorical(probs)
 
         if random.random() < self.epsilon:
@@ -132,7 +148,7 @@ class PPOAgent:
             batch_old_log_probs = old_log_probs[i:i+self.batch_size]
 
             # ✅ 2. 새로운 정책(`π_new`)의 확률 계산
-            probs = torch.softmax(self.model(batch_states), dim=-1)
+            probs = torch.softmax(self.model(batch_states) / self.temperature, dim=-1)
             # action_probs = probs.gather(1, batch_actions.unsqueeze(1)).squeeze()
             dist = torch.distributions.Categorical(probs)
             new_log_probs = dist.log_prob(batch_actions)
@@ -149,8 +165,11 @@ class PPOAgent:
             if not torch.isfinite(ratio).all():
                 print("⚠️ Invalid ratio detected:", ratio)
             
+            entropy = dist.entropy().mean()
+
             clipped_ratio = torch.clamp(ratio, 1 - self.clampepsilon, 1 + self.clampepsilon) # 확률 비율이 너무 커지지 않도록 클리핑(ε=0.2) 적용
             loss = -torch.min(ratio * batch_rewards, clipped_ratio * batch_rewards).mean() # 손실 함수
+            loss -= self.entropy_coef * entropy  # ✅ 엔트로피 보상 추가
 
             # ✅ TensorBoard 기록 추가
             if self.writer:
