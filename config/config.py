@@ -82,6 +82,8 @@ class ConfigManager:
     def get_transaction_fee(self):
         return self.config["env"].get("transaction_fee", 0.001)  # 기본값 설정
 
+    def get_max_shares_per_trade(self):
+        return self.config["env"].get("max_shares_per_trade", 100)  # 기본값 100
     ## =============================== ##
     ##        Training 설정 Getter     ##
     ## =============================== ##

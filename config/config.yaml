@@ -8,6 +8,7 @@ env:
   initial_balance: 10000000  # 초기 잔액
   observation_window: 15  # 한 번에 입력하는 시계열 길이
   transaction_fee: 0.001    # 거래 수수료 (0.1% = 0.001)
+  max_shares_per_trade: 400  # 분할 매수, 매도 상한
 
 training:
   episodes: 10000       # 학습 에피소드 수
@@ -21,7 +22,7 @@ training:
   num_workers: NULL          # 병렬 환경 개수 (멀티 프로세싱 사용 시)
 
 model:
-  input_dim: 1           # 입력 피처 개수 (자동 설정 가능)
+  input_dim: 10          # 입력 피처 개수 (자동 설정 가능)
   model_dim: 1024           # Transformer 모델 차원
   num_heads: 4            # Transformer Multi-Head Attention 개수, 각 칼럼에 가중치를 다르게 두고 학습
   num_layers: 4           # Transformer 레이어 개수

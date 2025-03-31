@@ -5,7 +5,7 @@
 # tensorboard --logdir=logs/trading_env 파이썬 3.13버전에서는 텐서보드 안됨
 # tensorboard --logdir=logs
 
-import os, sys
+import os, sys, shutil
 from env.stock_env import StockTradingEnv
 from models.transformer_model import StockTransformer
 from agents.ppo_agent import PPOAgent
@@ -40,8 +40,16 @@ log_manager.logger.info(f"✅ 학습 장치 설정: {device}")
 log_manager.logger.info("데이터 불러오기...")
 stock_prices, input_dim = load_stock_data("data/csv/005930.KS_combined_train_data.csv")
 
+# ✅ 기존 텐서보드 로그 삭제
+log_dir = "logs/trading_env"
+if os.path.exists(log_dir):
+    log_manager.logger.info(f"📁 기존 텐서보드 로그 디렉토리 삭제: {log_dir}")
+    shutil.rmtree(log_dir)
+
+# ✅ 텐서보드 로그 기록 시작
+writer = SummaryWriter(log_dir=log_dir)
+
 # ✅ 환경 및 모델 생성 (config.yaml에서 설정값 자동 적용)
-writer = SummaryWriter(log_dir="logs/trading_env")
 env = StockTradingEnv(stock_prices, writer=writer)
 model = StockTransformer(input_dim=input_dim).to(device)  # ✅ 모델을 GPU/CPU로 이동
 # ✅ 정확한 입력 피처 개수 로그 출력 (보유 주식 수 포함된 input_dim)

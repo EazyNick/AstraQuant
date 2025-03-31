@@ -40,6 +40,8 @@ class PPOAgent:
         self.epsilon = config_manager.get_epsilon()
         self.epsilon_min = config_manager.get_epsilon_min()
         self.epsilon_decay = config_manager.get_epsilon_decay()
+        self.max_shares_per_trade = config_manager.get_max_shares_per_trade()
+        self.action_dim = 1 + 2 * self.max_shares_per_trade
 
         # ✅ TensorBoard 설정
         self.writer = writer 
@@ -54,13 +56,22 @@ class PPOAgent:
         
         # logits는 모델의 마지막 출력층에서 나온 가공되지 않은 값들
         logits = self.model(state)  # 모델의 원시 출력
-        # ✅ 액션별 logits 값 할당
-        sell_logit, hold_logit, buy_logit = logits[0].tolist()  # Tensor를 리스트로 변환하여 값 추출
 
+        # logits 출력 검증 및 디버깅용 로그 (1D 텐서로 변환)
+        logits_list = logits[0].tolist()
+
+        # 100 step마다 일부 액션 logits 출력 (예: 앞쪽 5개, 뒤쪽 5개)
         if self.train_step % 100 == 0:
+            sample_log = {
+                f"Action_{i}": f"{logits_list[i]:.4f}" for i in range(min(5, self.action_dim))
+            }
+            if self.action_dim > 10:
+                sample_log.update({
+                    f"Action_{self.action_dim - i - 1}": f"{logits_list[-i - 1]:.4f}" for i in range(5)
+                })
+
             log_manager.logger.debug(
-                f"{self.train_step} step Raw logits → "
-                f"Sell: {sell_logit:.4f}, Hold: {hold_logit:.4f}, Buy: {buy_logit:.4f}"
+                f"{self.train_step} step Raw logits (샘플): {sample_log}"
             )
         # 🔍 모델 출력(logits)의 유효성 검사
         if not torch.isfinite(logits).all():
@@ -71,7 +82,7 @@ class PPOAgent:
         dist = torch.distributions.Categorical(probs)
 
         if random.random() < self.epsilon:
-            action = random.choice([0, 1, 2])
+            action = random.choice(list(range(self.action_dim)))
             log_prob = dist.log_prob(torch.tensor(action).to(self.device))  # ✅ 신경망 기반 log_prob
             # action_names = ["매도", "관망", "매수"]
             # log_manager.logger.debug(f"[탐험] 랜덤 액션 선택: {action} ({action_names[action]}) (입실론={self.epsilon:.4f})")
@@ -84,19 +95,17 @@ class PPOAgent:
 
         # print(f"📝 Logging at step {self.train_step}: Sell={probs[0,0].item():.4f}, Hold={probs[0,1].item():.4f}, Buy={probs[0,2].item():.4f}")
 
+        self.train_step += 1  # 학습 스텝 증가
         # ✅ TensorBoard에 action 확률 기록
-        self.writer.add_scalars("Action Probabilities", {
-            "Sell": probs[0, 0].item(),
-            "Hold": probs[0, 1].item(),
-            "Buy": probs[0, 2].item(),
-        }, self.train_step)
+        if self.action_dim <= 10:
+            for i in range(self.action_dim):
+                self.writer.add_scalar(f"Action_Prob/Action_{i}", probs[0, i].item(), self.train_step)
+
 
         # ⚠️ 확률 값의 유효성 검사만 진행 (클리핑 X)
         if not torch.isfinite(probs).all() or (probs < 0).any():
             print("⚠️ Invalid probability tensor detected:", probs)
             return random.choice([0, 1, 2])  # 문제가 발생하면 랜덤 액션 반환
-
-        self.train_step += 1  # 학습 스텝 증가
 
         return action, log_prob.item()
 
@@ -172,7 +181,7 @@ if __name__ == "__main__":
 
     # ✅ 가짜 데이터(Mock Data) 생성 (랜덤 데이터)
     batch_size = config_manager.get_batch_size()
-    test_states = torch.randn(batch_size, seq_len, input_dim).to(device)  # (batch, seq_len, feature_dim)
+    test_states = torch.randn(batch_size, seq_len, input_dim+1).to(device)  # (batch, seq_len, feature_dim)
     
     # ✅ Transformer 모델 생성 및 PPOAgent 초기화
     model = StockTransformer(input_dim=input_dim).to(device)
@@ -180,16 +189,20 @@ if __name__ == "__main__":
 
     # ✅ 액션 선택 테스트
     log_manager.logger.debug("\n🎯 액션 선택 테스트:")
-    test_state = test_states[0].cpu().numpy()  # 단일 샘플 (CPU로 변환하여 테스트)
+    test_state = test_states[0].to(device).numpy()  # (seq_len, input_dim)
     action = agent.select_action(test_state)
     log_manager.logger.debug(f"🔹 선택된 액션: {action}")  # 0 (매도), 1 (보유), 2 (매수)
-
+    
     # ✅ 업데이트 테스트 (가짜 메모리 데이터)
     log_manager.logger.debug("\n📌 에이전트 업데이트 테스트:")
-    test_memory = [
-        (test_states[i].cpu().numpy(), np.random.randint(0, 3), np.random.randn()) 
-        for i in range(batch_size)
-    ]  # (state, action, reward) 랜덤 데이터 생성
+    action_dim = 1 + 2 * config_manager.get_max_shares_per_trade()
+
+    test_memory = []
+    for i in range(batch_size):
+        state = test_states[i].cpu().numpy()
+        action, log_prob = agent.select_action(state)  # ✅ log_prob 포함
+        reward = np.random.randn()
+        test_memory.append((state, action, reward, log_prob))
 
     log_manager.logger.debug(f"📝 메모리 샘플 개수: {len(test_memory)}")
     agent.update(test_memory)
