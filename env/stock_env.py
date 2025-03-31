@@ -43,7 +43,8 @@ class StockTradingEnv(gym.Env):
         self.shares_held = 0 # 보유 주식 수
         self.previous_portfolio_value = self.initial_balance 
         
-        self.action_space = spaces.Discrete(3)  # 0: 매도, 1: 보유, 2: 매수
+        self.max_shares_per_trade = config_manager.get_max_shares_per_trade()
+        self.action_space = spaces.Discrete(1 + 2 * self.max_shares_per_trade)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.observation_window, self.feature_dim), dtype=np.float32)
 
         # ✅ TensorBoard 추가
@@ -77,9 +78,13 @@ class StockTradingEnv(gym.Env):
             log_manager.logger.warning(f"[Step {self.current_step}] 경고: 유효하지 않은 가격 {price}.")
             return None, 0, True  # 가격이 NaN이면 종료
 
-        if action == 2:  # 매수 (Buy)
-            shares_to_buy = self.balance / (price * (1 + self.transaction_fee)) # 살 수 있는 최대 주식 수
-            shares_to_buy = int(shares_to_buy) # 정수 값으로 변환 (소수점 이하 버림)
+        if action == 0:
+            # 관망
+            pass
+
+        elif 1 <= action <= self.max_shares_per_trade: 
+            # 매수 (Buy)
+            shares_to_buy = action # action개 만큼 매수
             cost = shares_to_buy * price * (1 + self.transaction_fee)  # 거래 수수료 포함
             if cost <= self.balance:  # 잔고가 충분한 경우에만 매수
                 self.shares_held += shares_to_buy
@@ -87,14 +92,17 @@ class StockTradingEnv(gym.Env):
             # else:
             #     reward -= 1  # 매수를 원했지만 실패한 경우 패널티 추가
 
-        elif action == 0:
-            if self.shares_held > 0: # 매도 (Sell)
-                revenue = self.shares_held * price * (1 - self.transaction_fee)  # 거래 수수료 포함
+        elif self.max_shares_per_trade < action <= 2 * self.max_shares_per_trade:
+            # 매도 (Sell)
+            if self.shares_held > 0: 
+                shares_to_sell = action - self.max_shares_per_trade
+                shares_to_sell = min(shares_to_sell, self.shares_held)
+                revenue = shares_to_sell * price * (1 - self.transaction_fee)  # 거래 수수료 포함
                 self.balance += revenue
-                self.shares_held = 0  # 전량 매도
+                self.shares_held -= shares_to_sell # 매도한만큼 주식수량 조정
             # else:
             #     reward -= 1  # 매도를 원했지만 실패한 경우 패널티 추가
-        
+            
         self.current_step += 1
         done = self.current_step >= len(self.stock_data) - self.observation_window
         next_state = self.stock_data[self.current_step:self.current_step + self.observation_window]

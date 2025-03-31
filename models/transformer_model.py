@@ -54,6 +54,9 @@ class StockTransformer(nn.Module):
         num_heads = config_manager.get_num_heads()
         num_layers = config_manager.get_num_layers()
 
+        self.max_shares_per_trade = config_manager.get_max_shares_per_trade()
+        self.action_dim = 1 + 2 * self.max_shares_per_trade  # 🔹 액션 개수 동적 설정
+
         # ✅ 입력 차원 설정 (기본값: config에서 불러오기)
         if input_dim is None:
             input_dim = config_manager.get_input_dim()
@@ -64,13 +67,12 @@ class StockTransformer(nn.Module):
 
         # 입력 데이터를 Transformer 입력 차원으로 변환
         self.embedding = nn.Linear(self.input_dim, model_dim).to(self.device)
-
         # Transformer 인코더 레이어 설정 (batch_first=True 옵션 추가)
         encoder_layer = nn.TransformerEncoderLayer(d_model=model_dim, nhead=num_heads, batch_first=True).to(self.device)
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers).to(self.device)
 
         # 매수(Buy), 보유(Hold), 매도(Sell) 3가지 액션을 위한 최종 FC 레이어
-        self.fc = nn.Linear(model_dim, 3).to(self.device)
+        self.fc = nn.Linear(model_dim, self.action_dim).to(self.device)
 
     def forward(self, x):
         # log_manager.logger.debug(f"입력 데이터 초기 shape: {x.shape}")
