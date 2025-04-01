@@ -126,6 +126,7 @@ class StockTradingEnv(gym.Env):
         long_term_reward = 0
         holding_reward = 0
         future_reward = 0
+        future_return = 0
 
         # 포트폴리오 가치 변화율을 보상으로 설정 (수익률 기반 보상), 단기 수익률 보상
         if self.previous_portfolio_value > 0:
@@ -149,28 +150,28 @@ class StockTradingEnv(gym.Env):
         future_min_price = np.min(self.stock_data[self.current_step + 1:future_step + 1, 0])
         
         # 리워드 계산
-        if action == 2:  # 매수(Buy)
+        if 1 <= action <= self.max_shares_per_trade:  # 매수(Buy)
             if future_max_price <= price:  # 미래 최고가가 현재 가격보다 낮거나 같으면 손실 가능성이 큼
                 future_return = ((future_min_price - price) / price) * self.shares_held * 1.5
             else:  # 미래 최고가가 현재 가격보다 높으면 기존 방식 유지
                 future_return = ((future_max_price - price) / price) * self.shares_held * 1.2
-        elif action == 0:  # 매도(Sell)
+        elif self.max_shares_per_trade < action <= 2 * self.max_shares_per_trade:  # 매도(Sell)
             if future_min_price >= price:  # 미래 최저가가 현재 가격보다 높거나 같으면 손실 가능성이 큼
                 future_return = ((price - future_max_price) / price) * self.shares_held * 1.2
             else:  # 미래 최저가가 현재 가격보다 낮으면 기존 방식 유지
                 future_return = ((price - future_min_price) / price) * self.shares_held * 1.5
 
-        else:  # 관망(Hold)
+        elif action == 0:  # 관망(Hold)
             if self.shares_held > 0:  # 주식을 보유 중이라면
                 # 미래 최고가와 현재 가격 비교
                 if future_max_price > price:  # 가격이 오를 경우 큰 보상
                     future_return = ((future_max_price - price) / price) * self.shares_held * 1.2  # 가격 상승 보상
                 else:  # 가격이 떨어지거나 그대로인 경우 패널티
-                    future_return = ((future_min_price - price) / price) * self.shares_held * 6  # 패널티는 더 크게 (음수값)
+                    future_return = ((future_min_price - price) / price) * self.shares_held * 2  # 패널티는 더 크게 (음수값)
             else:  # 주식을 보유하지 않은 상태라면
                 # 미래 가격이 오르면 주식을 사지 않은 것에 대한 패널티
                 if future_max_price > price:
-                    future_return = -((future_max_price - price) / price) * 6  # 매수 기회를 놓친 것에 대한 패널티
+                    future_return = -((future_max_price - price) / price) * 2  # 매수 기회를 놓친 것에 대한 패널티
                 # 미래 가격이 떨어지면 주식을 사지 않은 것에 대한 보상
                 else:
                     future_return = ((price - future_min_price) / price) * 1.2  # 하락을 피한 것에 대한 보상

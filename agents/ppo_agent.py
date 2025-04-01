@@ -67,7 +67,7 @@ class PPOAgent:
         # 100 step마다 일부 액션 logits 출력
         if self.train_step % 100 == 0:
             # 상위 10개 logits 값과 인덱스 추출
-            topk = sorted(enumerate(logits_list), key=lambda x: x[1], reverse=True)[:10]
+            topk = sorted(enumerate(logits_list), key=lambda x: x[1], reverse=True)[:3]
 
             topk_log = {}
             for idx, val in topk:
