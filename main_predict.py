@@ -81,7 +81,11 @@ if __name__ == "__main__":
     #     raise ValueError("모델이 로드되지 않았습니다.")
 
     df = pd.read_csv(args.test_data or 'data/csv/sp500_test_data.csv')
-    dates = df['Date'].values # ✅ 날짜 데이터 저장
+    df['Date'] = pd.to_datetime(df['Date'])  # 날짜 형식 변환
+    df = df.sort_values('Date').reset_index(drop=True)
+    dates = df['Date'].values  # 다시 정렬된 날짜로 업데이트
+
+    log_manager.logger.info(f"📅 전체 테스트 데이터 마지막 날짜: {dates[-1]}")
 
     # ✅ 마지막 observation_window 만큼의 데이터 가져오기
     observation_window = config_manager.get_observation_window()
@@ -89,8 +93,18 @@ if __name__ == "__main__":
         raise ValueError(f"❌ 테스트 데이터가 너무 적습니다! (필요: {observation_window}, 제공됨: {stock_data.shape[0]})")
 
     # ✅ 전체 데이터에 대한 예측 수행
-    action_dict = {0: "매도(Sell)", 1: "관망(Hold)", 2: "매수(Buy)"}
+    action_dict = {}
+    max_volume = config_manager.get_max_shares_per_trade()
+    # action_dict 생성
+    action_dict[0] = "관망(Hold)"
+    for i in range(1, max_volume + 1):
+        action_dict[i] = f"매수(Buy) {i}주"
+        action_dict[i + max_volume] = f"매도(Sell) {i}주"
+
     predictions = []
+    # ✅ stock_data 크기만큼 앞에서 자르기
+    if len(dates) > stock_data.shape[0]:
+        dates = dates[-stock_data.shape[0]:]  # 뒤쪽 기준으로 자르기
 
     for i in range(observation_window, stock_data.shape[0]):
         state = stock_data[i - observation_window:i] # 관찰 윈도우 데이터 추출
@@ -99,28 +113,73 @@ if __name__ == "__main__":
         state_with_holding = np.concatenate([state, holding_column], axis=1)
         date = dates[i] # 해당 날짜 가져오기
         action, probs = predict_action(model, state_with_holding, device)
-        predictions.append([date, action_dict[action], probs[0]])
+        predictions.append([date, action_dict[action], probs[-1]])
 
         # ✅ 보유 수량 업데이트
-        if action == 2:  # 매수
-            holding += 8000
-        elif action == 0 and holding > 0:  # 매도
-            holding -= 8000
+        if 1 <= action <= max_volume:  # 매수
+            holding += action
+        elif max_volume < action <= 2 * max_volume:  # 매도
+            sell_volume = action - max_volume
+            holding = max(0, holding - sell_volume)
 
     # ✅ 데이터프레임으로 변환 및 출력
-    # ✅ 모든 행을 출력하도록 설정 변경
     pd.set_option("display.max_rows", None)
+    # ✅ 데이터프레임으로 변환 및 상·하위 5개만 출력
     result_df = pd.DataFrame(predictions, columns=["날짜", "예측 매매 결정", "확률(%)"])
-    log_manager.logger.info(result_df)
 
-    # ✅ 각 매매 결정별 총 개수 계산 및 출력
-    action_counts = result_df["예측 매매 결정"].value_counts()
-    total_sell = action_counts.get("매도(Sell)", 0)
-    total_hold = action_counts.get("관망(Hold)", 0)
-    total_buy  = action_counts.get("매수(Buy)", 0)
+    log_manager.logger.info("📌 예측 결과 (상위 5개)")
+    log_manager.logger.info(result_df.head(5))
+
+    log_manager.logger.info("📌 예측 결과 (하위 5개)")
+    log_manager.logger.info(result_df.tail(5))
+
+    # 각 매매 결정별 총 개수 계산
+    total_sell = result_df["예측 매매 결정"].str.startswith("매도").sum()
+    total_hold = result_df["예측 매매 결정"].str.startswith("관망").sum()
+    total_buy  = result_df["예측 매매 결정"].str.startswith("매수").sum()
 
     summary = f"총 매도: {total_sell}건, 총 관망: {total_hold}건, 총 매수: {total_buy}건"
     log_manager.logger.info(summary)
 
+    # ✅ 확률 분포에서 매수/매도/관망 각각의 총합 계산
+    buy_prob_sum = np.sum(probs[0][1:max_volume + 1])
+    sell_prob_sum = np.sum(probs[0][max_volume + 1:2 * max_volume + 1])
+    hold_prob = probs[0][0]
+
+    total_sum = buy_prob_sum + sell_prob_sum + hold_prob
+
+    buy_percent = (buy_prob_sum / total_sum) * 100
+    sell_percent = (sell_prob_sum / total_sum) * 100
+    hold_percent = (hold_prob / total_sum) * 100
+
+    log_manager.logger.info(f"📊 전체 확률 분포 요약:")
+    log_manager.logger.info(f"🟩 매수(Buy) 확률 총합: {buy_prob_sum:.2f} ({buy_percent:.2f}%)")
+    log_manager.logger.info(f"🟥 매도(Sell) 확률 총합: {sell_prob_sum:.2f} ({sell_percent:.2f}%)")
+    log_manager.logger.info(f"🟨 관망(Hold) 확률: {hold_prob:.2f} ({hold_percent:.2f}%)")
+
+
+    # ✅ 실제 데이터의 마지막 날짜 (df 기준)
+    true_last_date = df.iloc[-1]['Date']
+    log_manager.logger.info(f"📅 전체 테스트 데이터의 진짜 마지막 날짜: {true_last_date}")
+
+    # ✅ 예측 구간 기준 마지막 날짜 및 액션 결과
+    predicted_last_date, last_action_str, _ = predictions[-1]
+    last_action_index = action  # 마지막 루프에서 나온 action 값
+    last_action_prob = probs[0][last_action_index]
+
+    log_manager.logger.info(f"📅 예측 가능한 구간의 마지막 날짜: {predicted_last_date}")
+    log_manager.logger.info(f"📈 마지막 예측 액션: {last_action_str} (확률: {last_action_prob:.2f}%)")
+
+    # ✅ 액션 유형별 상세 로그
+    if last_action_str.startswith("매수"):
+        shares_bought = int(last_action_str.split()[1].replace("주", ""))
+        log_manager.logger.info(f"🛒 마지막 시점에서 {shares_bought}주 매수 예정 (확률: {last_action_prob:.2f}%)")
+    elif last_action_str.startswith("매도"):
+        shares_sold = int(last_action_str.split()[1].replace("주", ""))
+        log_manager.logger.info(f"💰 마지막 시점에서 {shares_sold}주 매도 예정 (확률: {last_action_prob:.2f}%)")
+    else:
+        log_manager.logger.info(f"⏸ 마지막 시점에서는 관망(Hold) 상태입니다. (확률: {last_action_prob:.2f}%)")
+
+
     # 예시 명령어
-    # python main_predict.py --model_path output/ppo_stock_trader_episode_135.pth --test_data data/csv/005930.KS_combined_train_data.csv
+    # python main_predict.py --model_path output/ppo_stock_trader_episode_57.pth --test_data data/csv/005930.KS_combined_test_data.csv
