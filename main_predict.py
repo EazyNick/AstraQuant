@@ -37,8 +37,19 @@ def load_model(model_path, model_class, input_dim, device="cpu"):
         # ✅ 가중치 로드 (PyTorch 2.6 이후 버전 대응)
         state_dict = torch.load(model_path, map_location=device)
 
+        missing, unexpected = model.load_state_dict(state_dict, strict=False)
+
+        print(f"✅ 모델 로드 완료: {model_path}")
+        if missing:
+            print(f"⚠️ 누락된 가중치: {missing}")
+        if unexpected:
+            print(f"⚠️ 예상치 못한 키: {unexpected}")
+
+        # for name, param in model.named_parameters():
+        #     print(f"🔍 {name}: mean={param.data.mean():.6f}, std={param.data.std():.6f}")
+
         # ✅ 가중치 적용 (strict=False: 모델 구조가 일부 다를 경우 대비)
-        model.load_state_dict(state_dict, strict=False)
+        # model.load_state_dict(state_dict, strict=False)
 
         # ✅ 모델 평가 모드 설정
         model.eval()
@@ -58,6 +69,11 @@ def format_probs(probs):
 # 매매 결정 함수
 def predict_action(model, state, device):
     state = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(device) # (1, seq_len, feature_dim) 변환
+    # with torch.no_grad():
+    #     logits = model(state)
+    #     print(f"🧐 모델 출력(logits) 샘플: {logits.cpu().numpy()[0][:10]}")  # 앞 10개 출력
+    #     probs = torch.softmax(logits, dim=-1)
+    #     print(f"📊 Softmax 확률 샘플: {probs.cpu().numpy()[0][:10]}")  # 앞 10개 확률
     probs = torch.softmax(model(state), dim=-1) # 확률 계산
     action = torch.argmax(probs, dim=-1).item() # 가장 높은 확률의 액션 선택
     return action, format_probs(probs.cpu().detach().numpy()) # 액션과 확률 반환
@@ -182,4 +198,4 @@ if __name__ == "__main__":
 
 
     # 예시 명령어
-    # python main_predict.py --model_path output/ppo_stock_trader_episode_57.pth --test_data data/csv/005930.KS_combined_test_data.csv
+    # python main_predict.py --model_path output/ppo_stock_trader_episode_10.pth --test_data data/csv/005930.KS_combined_test_data.csv
