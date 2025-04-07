@@ -176,7 +176,6 @@ if __name__ == "__main__":
 
     # ✅ 실제 데이터의 마지막 날짜 (df 기준)
     true_last_date = df.iloc[-1]['Date']
-    log_manager.logger.info(f"📅 전체 테스트 데이터의 진짜 마지막 날짜: {true_last_date}")
 
     # ✅ 예측 구간 기준 마지막 날짜 및 액션 결과
     predicted_last_date, last_action_str, _ = predictions[-1]
@@ -198,4 +197,4 @@ if __name__ == "__main__":
 
 
     # 예시 명령어
-    # python main_predict.py --model_path output/ppo_stock_trader_episode_10.pth --test_data data/csv/005930.KS_combined_test_data.csv
+    # python main_predict.py --model_path output/ppo_stock_trader_episode_54.pth --test_data data/csv/005930.KS_combined_test_data.csv

@@ -117,7 +117,7 @@ class StockTradingEnv(gym.Env):
 
         # 과거 보유 주식 수 기록을 상태와 함께 결합
         shares_held_feature = self.shares_held_history.reshape(-1, 1)  # (observation_window, 1)
-        next_state_with_shares = np.hstack((next_state, shares_held_feature))
+        next_state_with_shares = np.hstack((next_state, shares_held_feature / 100))
 
         # 새로운 포트폴리오 가치 계산
         new_portfolio_value = self.balance + (self.shares_held * price)
