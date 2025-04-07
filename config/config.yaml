@@ -6,13 +6,13 @@ general:
 
 env:
   initial_balance: 10000000  # 초기 잔액
-  observation_window: 15  # 한 번에 입력하는 시계열 길이
+  observation_window: 10  # 한 번에 입력하는 시계열 길이
   transaction_fee: 0.001    # 거래 수수료 (0.1% = 0.001)
   max_shares_per_trade: 400  # 분할 매수, 매도 상한
 
 training:
   episodes: 10000       # 학습 에피소드 수
-  batch_size: 32          # 배치 크기
+  batch_size: 16          # 배치 크기
   epsilon: 0.999          # 시작 입실론
   epsilon_min: 0.1     # 최소 입실론
   epsilon_decay: 0.999  # 매 스텝마다 곱해질 감쇠율
