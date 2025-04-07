@@ -38,6 +38,11 @@ def load_stock_data(file_path):
     # ✅ "Close" 포함하면서 W_Close, M_Close는 제외
     close_columns = [col for col in df.columns if "Close" in col and col not in ["W_Close", "M_Close"]]
 
+    # ✅ Close 계열 값 스케일링 (1000으로 나누기)
+    for col in close_columns:
+        if col in df.columns:
+            df[col] = df[col] / 1000.0
+
     # ✅ 남길 컬럼 리스트
     selected_columns = close_columns + [
         "D_Slope_SMA_5", "D_Slope_SMA_10", "D_Slope_SMA_15", "D_Slope_SMA_20",

@@ -42,7 +42,7 @@ class PPOAgent:
         self.epsilon_decay = config_manager.get_epsilon_decay()
         self.max_shares_per_trade = config_manager.get_max_shares_per_trade()
         self.action_dim = 1 + 2 * self.max_shares_per_trade
-        self.temperature = 3.0
+        self.temperature = 1.2
         # temperature > 1 → 분포를 평평하게 (더 많은 탐험)
         # temperature < 1 → 분포를 더 날카롭게 (결정적 행동 강화)
         self.entropy_coef = 0.02  # ✅ 조정 가능
@@ -156,6 +156,7 @@ class PPOAgent:
             # ✅ 3. PPO Clipped Objective 계산
             # PPO Clipped Objective 계산
             ratio = torch.exp(new_log_probs - batch_old_log_probs) # 확률 비율(`π_new / π_old`) 계산
+            advantages = batch_rewards - batch_rewards.mean() # 해당 행동이 평균보다 얼마나 더 좋은가?
 
             # 🔍 확률 비율이 너무 크거나 작은 경우 확인
             if (ratio > 10).any() or (ratio < 0.1).any():
@@ -166,9 +167,8 @@ class PPOAgent:
                 print("⚠️ Invalid ratio detected:", ratio)
             
             entropy = dist.entropy().mean()
-
             clipped_ratio = torch.clamp(ratio, 1 - self.clampepsilon, 1 + self.clampepsilon) # 확률 비율이 너무 커지지 않도록 클리핑(ε=0.2) 적용
-            loss = -torch.min(ratio * batch_rewards, clipped_ratio * batch_rewards).mean() # 손실 함수
+            loss = -torch.min(ratio * advantages, clipped_ratio * advantages).mean() # 손실 함수
             loss -= self.entropy_coef * entropy  # ✅ 엔트로피 보상 추가
 
             # ✅ TensorBoard 기록 추가
@@ -177,6 +177,8 @@ class PPOAgent:
                 self.writer.add_scalar("PPO Ratio Mean", ratio.mean().item(), self.train_step)  # 확률 비율 기록
                 self.writer.add_scalar("PPO Clipped Ratio Mean", clipped_ratio.mean().item(), self.train_step)  # 클리핑 비율 기록
                 self.writer.add_scalar("Batch Reward Mean", batch_rewards.mean().item(), self.train_step)  # 보상 평균 기록
+                self.writer.add_scalar("Advantage Mean", advantages.mean().item(), self.train_step)
+                self.writer.add_scalar("Advantage Std", advantages.std().item(), self.train_step)
 
             # ✅ 4. 모델 업데이트
             self.optimizer.zero_grad()
