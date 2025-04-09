@@ -197,4 +197,4 @@ if __name__ == "__main__":
 
 
     # 예시 명령어
-    # python main_predict.py --model_path output/ppo_stock_trader_episode_54.pth --test_data data/csv/005930.KS_combined_test_data.csv
+    # python main_predict.py --model_path output/ppo_stock_trader_episode_158.pth --test_data data/csv/005930.KS_combined_test_data.csv
