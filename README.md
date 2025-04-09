@@ -108,8 +108,7 @@ output/model_predictions.csv
 
 ## 📌 업데이트 예정
 
-- ActorCritic (V003)
-- tensorboard (V004) # 3.13 파이썬 버전에서 지원되지 않음
+- ActorCritic (V006)
 
 
 ## 📌 문의 및 이슈 등록
