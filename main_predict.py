@@ -78,6 +78,29 @@ def predict_action(model, state, device):
     action = torch.argmax(probs, dim=-1).item() # 가장 높은 확률의 액션 선택
     return action, format_probs(probs.cpu().detach().numpy()) # 액션과 확률 반환
 
+def get_prediction_by_date(result_df, target_date: str):
+    """
+    예측 결과에서 특정 날짜에 해당하는 액션과 확률을 반환
+
+    Args:
+        result_df (pd.DataFrame): 예측 결과 데이터프레임
+        target_date (str): 조회할 날짜 (예: "2023-12-01")
+
+    Returns:
+        tuple: (예측 매매 결정(str), 확률(float)) 또는 (None, None) ← 해당 날짜 없을 경우
+    """
+    row = result_df[result_df["날짜"] == target_date]
+    if row.empty:
+        print(f"❌ 날짜 '{target_date}'에 대한 예측 결과가 없습니다.")
+        return None, None
+    action_str = row.iloc[0]["예측 매매 결정"]
+    prob = row.iloc[0]["확률(%)"]
+    if isinstance(prob, np.ndarray):
+        prob = prob.item()
+    else:
+        prob = float(prob)
+    return action_str, prob
+
 if __name__ == "__main__":
     import pandas as pd
     # ✅ 설정 가져오기
@@ -87,6 +110,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     device = torch.device(config_manager.get_device())
+    balance = config_manager.get_initial_balance()
+    transaction_fee = config_manager.get_transaction_fee()
     # ✅ 초기 보유 수량
     holding = 0
 
@@ -129,14 +154,22 @@ if __name__ == "__main__":
         state_with_holding = np.concatenate([state, holding_column], axis=1)
         date = dates[i] # 해당 날짜 가져오기
         action, probs = predict_action(actor_model, state_with_holding, device)
-        predictions.append([date, action_dict[action], probs[-1]])
+        predictions.append([date, action_dict[action], probs[0][action]])
+        current_price = stock_data[i, 0] * 100
 
         # ✅ 보유 수량 업데이트
-        if 1 <= action <= max_volume:  # 매수
-            holding += action
-        elif max_volume < action <= 2 * max_volume:  # 매도
-            sell_volume = action - max_volume
-            holding = max(0, holding - sell_volume)
+        if 1 <= action <= max_volume: # 매수
+            cost = action * current_price * (1 + transaction_fee)
+            if cost <= balance:
+                holding += action
+                balance -= cost
+                print("매수: " + holding + "주")
+        elif max_volume < action <= 2 * max_volume: # 매도
+            sell_volume = min(holding, action - max_volume)
+            revenue = sell_volume * current_price * (1 - transaction_fee)
+            balance += revenue
+            holding -= sell_volume
+            print("매도: " + holding + "주")
 
     # ✅ 데이터프레임으로 변환 및 출력
     pd.set_option("display.max_rows", None)
@@ -195,6 +228,11 @@ if __name__ == "__main__":
     else:
         log_manager.logger.info(f"⏸ 마지막 시점에서는 관망(Hold) 상태입니다. (확률: {last_action_prob:.2f}%)")
 
+    # 예시: 원하는 날짜 입력
+    target_date = "2020-03-27"
+    action_str, prob = get_prediction_by_date(result_df, target_date)
 
+    if action_str is not None:
+        log_manager.logger.info(f"📅 [{target_date}] 예측 결과: {action_str} (확률: {prob:.2f}%)")
     # 예시 명령어
-    # python main_predict.py --model_path output/ppo_stock_trader_episode_3.pth --test_data data/csv/005930.KS_combined_test_data.csv
+    # python main_predict.py --model_path output/ppo_stock_trader_episode_5.pth --test_data data/csv/005930.KS_combined_train_data.csv

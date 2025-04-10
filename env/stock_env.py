@@ -73,7 +73,7 @@ class StockTradingEnv(gym.Env):
     def step(self, action):
         """ 액션을 실행하고 새로운 상태, 보상, 종료 여부 반환 """
         reward = 0
-        price = self.stock_data[self.current_step, 0] * 100
+        price = self.stock_data[self.current_step, 0] * 100000
         if np.isnan(price) or price <= 0:
             log_manager.logger.warning(f"[Step {self.current_step}] 경고: 유효하지 않은 가격 {price}.")
             return None, 0, True  # 가격이 NaN이면 종료

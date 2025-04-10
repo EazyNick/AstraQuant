@@ -9,12 +9,12 @@
 
 ## 🚀 모델 개요
 ### **1️⃣ PPO (Proximal Policy Optimization)**
-본 프로젝트에서는 **PPO 알고리즘을 사용하여 최적의 거래 전략을 학습**합니다. ~~PPO는 정책 기반(Policy Gradient)과 가치 기반(Value Function)을 결합한 Actor-Critic 구조를 사용하여 학습을 진행합니다.~~
+본 프로젝트에서는 **PPO 알고리즘을 사용하여 최적의 거래 전략을 학습**합니다. PPO는 정책 기반(Policy Gradient)과 가치 기반(Value Function)을 결합한 Actor-Critic 구조를 사용하여 학습을 진행합니다.
 
-- ~~Actor (정책 네트워크): 주어진 상태에서 최적의 매매 결정을 수행하는 역할~~
-- ~~Critic (가치 네트워크): 특정 상태의 가치를 평가하여 Actor의 업데이트를 돕는 역할~~
-- ~~Clipped Objective Function을 사용하여 정책 업데이트가 과하게 변하지 않도록 안정성을 확보~~
-- ~~Advantage Estimation을 통해 학습 효율성을 향상~~
+- Actor (정책 네트워크): 주어진 상태에서 최적의 매매 결정을 수행하는 역할
+- Critic (가치 네트워크): 특정 상태의 가치를 평가하여 Actor의 업데이트를 돕는 역할
+- Clipped Objective Function을 사용하여 정책 업데이트가 과하게 변하지 않도록 안정성을 확보
+- Advantage Estimation을 통해 학습 효율성을 향상
 
 ### **2️⃣ Transformer 기반 신경망**
 기존 강화학습 모델에서는 CNN 또는 LSTM을 사용하지만, 본 프로젝트에서는 **트랜스포머 신경망을 활용하여 시계열 데이터를 처리**합니다.
