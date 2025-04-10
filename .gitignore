@@ -6,6 +6,7 @@ __pycache__/
 logs/log/*
 logs/ppo_training/*
 logs/trading_env/*
+logs/training/*
 *.pyc
 *.csv
 *.pth
