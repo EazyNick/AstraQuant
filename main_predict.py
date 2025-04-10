@@ -2,9 +2,9 @@ import torch
 import numpy as np
 import os
 import argparse
-from models.transformer_model import StockTransformer
+import pandas as pd
+from models.actor_network import ActorNetwork
 from data.data_loader import load_stock_data
-from config import config_manager 
 
 try:
     from logs import log_manager
@@ -92,7 +92,7 @@ if __name__ == "__main__":
 
     # ✅ 저장된 모델 로드 
     stock_data, input_dim = load_stock_data(args.test_data)
-    model = load_model(args.model_path, StockTransformer, input_dim, device)
+    actor_model = load_model(args.model_path, ActorNetwork, input_dim, device)
     # if model is None:
     #     raise ValueError("모델이 로드되지 않았습니다.")
 
@@ -128,7 +128,7 @@ if __name__ == "__main__":
         holding_column = np.full((observation_window, 1), holding, dtype=np.float32)
         state_with_holding = np.concatenate([state, holding_column], axis=1)
         date = dates[i] # 해당 날짜 가져오기
-        action, probs = predict_action(model, state_with_holding, device)
+        action, probs = predict_action(actor_model, state_with_holding, device)
         predictions.append([date, action_dict[action], probs[-1]])
 
         # ✅ 보유 수량 업데이트
@@ -197,4 +197,4 @@ if __name__ == "__main__":
 
 
     # 예시 명령어
-    # python main_predict.py --model_path output/ppo_stock_trader_episode_158.pth --test_data data/csv/005930.KS_combined_test_data.csv
+    # python main_predict.py --model_path output/ppo_stock_trader_episode_3.pth --test_data data/csv/005930.KS_combined_test_data.csv

@@ -1,3 +1,5 @@
+"""시퀀스의 순서를 네트워크가 인식할 수 있도록, 위치 정보를 벡터에 더해주는 역할"""
+
 import torch
 import torch.nn as nn
 import math
