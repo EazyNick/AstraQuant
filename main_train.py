@@ -42,7 +42,7 @@ log_manager.logger.info("데이터 불러오기...")
 stock_prices, input_dim = load_stock_data("data/csv/005930.KS_combined_train_data.csv")
 
 # ✅ 기존 텐서보드 로그 삭제
-log_dir = "logs/trading"
+log_dir = "logs/training"
 if os.path.exists(log_dir):
     log_manager.logger.info(f"📁 기존 텐서보드 로그 디렉토리 삭제: {log_dir}")
     shutil.rmtree(log_dir)

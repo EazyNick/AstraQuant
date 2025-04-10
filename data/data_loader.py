@@ -41,7 +41,7 @@ def load_stock_data(file_path):
     # ✅ Close 계열 값 스케일링 (1000으로 나누기)
     for col in close_columns:
         if col in df.columns:
-            df[col] = df[col] / 1000.0
+            df[col] = df[col] / 100000.0
 
     # ✅ 남길 컬럼 리스트
     selected_columns = close_columns + [
@@ -62,6 +62,22 @@ def load_stock_data(file_path):
 
     # ✅ 먼저 선택된 컬럼만 추출
     df = df[selected_columns]
+
+    # ✅ 각 Slope 컬럼에 대해 Z-score 정규화 또는 Tanh 변환 적용
+    slope_columns = [col for col in df.columns if "Slope" in col]
+
+    for col in slope_columns:
+        if col in df.columns:
+            # 방법 1: Z-score 정규화 (평균 0, 표준편차 1)
+            mean = df[col].mean()
+            std = df[col].std()
+            if std != 0:
+                df[col] = (df[col] - mean) / std
+            else:
+                df[col] = 0.0  # 표준편차가 0인 경우 정규화 불가 → 0 처리
+
+            # 방법 2 (대안): Tanh 정규화
+            # df[col] = np.tanh(df[col])
 
     # ✅ 0이 하나라도 있는 열 제거
     before_columns = df.columns.tolist()
@@ -107,3 +123,9 @@ if __name__ == "__main__":
         print(f"✅ 데이터 로드 완료! 데이터 Shape: {stock_data.shape}, 입력 피처 개수: {input_dim}")
     else:
         print(f"❌ 파일을 찾을 수 없습니다: {sample_file}")
+
+    # ✅ 정규화된 데이터를 CSV로 저장
+    output_csv_path = "output/processed_stock_data.csv"
+    os.makedirs(os.path.dirname(output_csv_path), exist_ok=True)  # 폴더 없으면 생성
+    pd.DataFrame(stock_data).to_csv(output_csv_path, index=False)
+    print(f"📁 정규화된 데이터가 저장되었습니다: {output_csv_path}")
