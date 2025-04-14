@@ -37,8 +37,8 @@ class ActorCriticAgent:
         self.gamma = config_manager.get_gamma()
         self.clampepsilon = config_manager.get_clampepsilon()
         self.batch_size = config_manager.get_batch_size()
-        self.entropy_coef = 0.0 # 엔트로피 보상 계수, 값을 키울수록 정책이 평평해짐. 0.02 등 값 권장
-        self.temperature = 1.0 # 정책 분포의 날카로움/평평함 조정, 1.0보다 클 경우 더욱 평평해짐(탐험 증가)
+        self.entropy_coef = 0.01 # 엔트로피 보상 계수, 값을 키울수록 정책이 평평해짐. 0.02 등 값 권장
+        self.temperature = 1.1 # 정책 분포의 날카로움/평평함 조정, 1.0보다 클 경우 더욱 평평해짐(탐험 증가)
 
         self.writer = writer
         self.train_step = 0
