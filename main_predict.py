@@ -150,12 +150,12 @@ if __name__ == "__main__":
     for i in range(observation_window, stock_data.shape[0]):
         state = stock_data[i - observation_window:i] # 관찰 윈도우 데이터 추출
         # ✅ 각 시점에 보유 수량을 붙임 (마지막 컬럼으로 추가)
-        holding_column = np.full((observation_window, 1), holding, dtype=np.float32)
+        holding_column = np.full((observation_window, 1), holding / 1000, dtype=np.float32)
         state_with_holding = np.concatenate([state, holding_column], axis=1)
         date = dates[i] # 해당 날짜 가져오기
         action, probs = predict_action(actor_model, state_with_holding, device)
         predictions.append([date, action_dict[action], probs[0][action]])
-        current_price = stock_data[i, 0] * 100
+        current_price = stock_data[i, 0] * 10000
 
         # ✅ 보유 수량 업데이트
         if 1 <= action <= max_volume: # 매수
@@ -163,13 +163,13 @@ if __name__ == "__main__":
             if cost <= balance:
                 holding += action
                 balance -= cost
-                print("매수: " + holding + "주")
+                print(f"매수: {holding}주")
         elif max_volume < action <= 2 * max_volume: # 매도
             sell_volume = min(holding, action - max_volume)
             revenue = sell_volume * current_price * (1 - transaction_fee)
             balance += revenue
             holding -= sell_volume
-            print("매도: " + holding + "주")
+            print(f"매도: {holding}주")
 
     # ✅ 데이터프레임으로 변환 및 출력
     pd.set_option("display.max_rows", None)
@@ -229,10 +229,12 @@ if __name__ == "__main__":
         log_manager.logger.info(f"⏸ 마지막 시점에서는 관망(Hold) 상태입니다. (확률: {last_action_prob:.2f}%)")
 
     # 예시: 원하는 날짜 입력
-    target_date = "2020-03-27"
+    target_date = "2024-07-12"
     action_str, prob = get_prediction_by_date(result_df, target_date)
 
     if action_str is not None:
         log_manager.logger.info(f"📅 [{target_date}] 예측 결과: {action_str} (확률: {prob:.2f}%)")
+
     # 예시 명령어
-    # python main_predict.py --model_path output/ppo_stock_trader_episode_5.pth --test_data data/csv/005930.KS_combined_train_data.csv
+    # python main_predict.py --model_path output/ppo_stock_trader_episode_350.pth --test_data data/csv/005930.KS_combined_train_data.csv
+    # python main_predict.py --model_path output/ppo_stock_trader_episode_409.pth --test_data data/csv/005930.KS_combined_test_data.csv

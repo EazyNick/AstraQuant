@@ -107,18 +107,6 @@ class StockTradingEnv(gym.Env):
         done = self.current_step >= len(self.stock_data) - self.observation_window
         next_state = self.stock_data[self.current_step:self.current_step + self.observation_window]
 
-        # 보유 주식 수 히스토리를 저장하는 배열 추가
-        if not hasattr(self, "shares_held_history"):
-            self.shares_held_history = np.zeros(self.observation_window)
-
-        # 가장 오래된 값을 제거하고, 새로운 보유 주식 수 추가
-        self.shares_held_history = np.roll(self.shares_held_history, shift=-1)
-        self.shares_held_history[-1] = self.shares_held  # 최신 보유 주식 수 업데이트
-
-        # 과거 보유 주식 수 기록을 상태와 함께 결합
-        shares_held_feature = self.shares_held_history.reshape(-1, 1)  # (observation_window, 1)
-        next_state_with_shares = np.hstack((next_state, shares_held_feature / 100))
-
         # 새로운 포트폴리오 가치 계산
         new_portfolio_value = self.balance + (self.shares_held * price)
 
@@ -176,7 +164,7 @@ class StockTradingEnv(gym.Env):
                 else:
                     future_return = ((price - future_min_price) / price) * 1.2  # 하락을 피한 것에 대한 보상
                 
-        future_reward = future_return * 5  # 수익률 기반 보상
+        future_reward = future_return * 2  # 수익률 기반 보상
 
         # ✅ 최종 보상 (각 보상 요소를 합산)
         reward = short_term_reward + long_term_reward + holding_reward + future_reward + reward
@@ -205,7 +193,37 @@ class StockTradingEnv(gym.Env):
 
         self.previous_portfolio_value = new_portfolio_value
          
+                # 보유 주식 수 히스토리를 저장하는 배열 추가
+        if not hasattr(self, "shares_held_history"):
+            self.shares_held_history = np.zeros(self.observation_window)
+
+        # 가장 오래된 값을 제거하고, 새로운 보유 주식 수 추가
+        self.shares_held_history = np.roll(self.shares_held_history, shift=-1)
+        self.shares_held_history[-1] = self.shares_held / 1000 # 최신 보유 주식 수 업데이트
+
+        # 과거 보유 주식 수 기록을 상태와 함께 결합
+        shares_held_feature = self.shares_held_history.reshape(-1, 1)  # (observation_window, 1)
+        next_state_with_shares = np.hstack((next_state, shares_held_feature))
+
         # log_manager.logger.debug(f"Step: {self.current_step}, Action: {['Sell', 'Hold', 'Buy'][action]}, Reward: {reward}, Portfolio: {new_portfolio_value}, Shares Held: {self.shares_held}")
+
+        # 입력 state 로그 출력해보기
+        # self.feature_names = [
+        #                     "D_Close",
+        #                     "D_Slope_SMA_5", "D_Slope_SMA_10", "D_Slope_SMA_15", "D_Slope_SMA_20",
+        #                     "W_Slope_SMA_5", "W_Slope_SMA_10",
+        #                     "M_Slope_SMA_5",
+        #                     "보유 주식 수"
+        #                 ]
+
+        # # ✅ 마지막 시점 상태 출력 (사람이 읽기 쉽게 각 항목 설명)
+        # last_state_row = next_state_with_shares[-1]  # 마지막 timestep의 입력
+        # log_msg = f"[Step {self.current_step}] 📥 입력 상태 (가장 최근 시점):\n"
+        # for name, value in zip(self.feature_names, last_state_row):
+        #     log_msg += f" - {name}: {value:.4f}\n"
+        # log_manager.logger.debug(log_msg.strip())
+
+
 
         return next_state_with_shares, reward, done
 
