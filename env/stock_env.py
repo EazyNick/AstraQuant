@@ -118,7 +118,7 @@ class StockTradingEnv(gym.Env):
 
         # 포트폴리오 가치 변화율을 보상으로 설정 (수익률 기반 보상), 단기 수익률 보상
         if self.previous_portfolio_value > 0:
-            short_term_reward = ((new_portfolio_value - self.previous_portfolio_value) / self.previous_portfolio_value) * 100 * 2
+            short_term_reward = ((new_portfolio_value - self.previous_portfolio_value) / self.previous_portfolio_value) * 100 * 3
         else:
             short_term_reward = 0
 
@@ -126,14 +126,14 @@ class StockTradingEnv(gym.Env):
         long_term_reward = ((new_portfolio_value - self.initial_balance) / self.initial_balance) * 100 * 1
 
         # 보유 주식 가격 상승 시 추가 보상
-        if self.shares_held > 0 and self.current_step > 0:
-            holding_reward = (price - self.stock_data[self.current_step - 1, 0]) * self.shares_held * 1
-        else:
-            holding_reward = 0
+        # if self.shares_held > 0 and self.current_step > 0:
+        #     holding_reward = (price - self.stock_data[self.current_step - 1, 0]) * self.shares_held * 1
+        # else:
+        #     holding_reward = 0
 
         # 10일 후의 `Buy & Hold` 수익률 계산
         future_step = min(self.current_step + 10, len(self.stock_data) - 1)
-        # 현재 스텝을 제외한 5일 이내의 최고가 & 최저가 찾기
+        # 현재 스텝을 제외한 10일 이내의 최고가 & 최저가 찾기
         future_max_price = np.max(self.stock_data[self.current_step + 1:future_step + 1, 0])
         future_min_price = np.min(self.stock_data[self.current_step + 1:future_step + 1, 0])
         

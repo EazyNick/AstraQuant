@@ -108,7 +108,7 @@ output/model_predictions.csv
 
 ## 📌 업데이트 예정
 
-- ActorCritic (V006)
+- 기타 최적화
 
 
 ## 📌 문의 및 이슈 등록
