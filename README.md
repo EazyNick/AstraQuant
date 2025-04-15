@@ -67,7 +67,7 @@ python training/train.py
 훈련된 모델을 사용하여 새로운 데이터를 기반으로 **매매 결정을 수행**합니다.
 
 ```bash
-python main_predict.py
+python main_predict.py --model_path output/ppo_stock_trader_episode_350.pth --test_data data/csv/005930.KS_combined_train_data.csv
 ```
 
 실행 후, **날짜별 매매 신호(매수/매도/관망)와 확률 값**이 출력됩니다.
