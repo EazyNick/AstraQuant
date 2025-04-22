@@ -143,6 +143,9 @@ if __name__ == "__main__":
         action_dict[i + max_volume] = f"매도(Sell) {i}주"
 
     predictions = []
+    probs_list = []  # ✅ 확률 리스트 저장용
+
+
     # ✅ stock_data 크기만큼 앞에서 자르기
     if len(dates) > stock_data.shape[0]:
         dates = dates[-stock_data.shape[0]:]  # 뒤쪽 기준으로 자르기
@@ -156,6 +159,8 @@ if __name__ == "__main__":
         action, probs = predict_action(actor_model, state_with_holding, device)
         predictions.append([date, action_dict[action], probs[0][action]])
         current_price = stock_data[i, 0] * 10000
+        probs_list.append(probs[0])  # ✅ 확률 분포 저장
+
 
         # ✅ 보유 수량 업데이트
         if 1 <= action <= max_volume: # 매수
@@ -235,6 +240,34 @@ if __name__ == "__main__":
     if action_str is not None:
         log_manager.logger.info(f"📅 [{target_date}] 예측 결과: {action_str} (확률: {prob:.2f}%)")
 
+        # ✅ 전체 액션 확률을 저장용 리스트로 정리
+        # ✅ 전체 액션 확률을 저장용 리스트로 정리
+    all_prob_records = []
+    for i in range(len(predictions)):
+        date = predictions[i][0]
+        main_action = predictions[i][1]
+        main_prob = predictions[i][2]
+        prob_row = probs_list[i]  # ✅ 확률 분포
+
+        row = {
+            "날짜": date,
+            "예측 매매 결정": main_action,
+            "확률(%)": main_prob,
+        }
+        for j in range(len(prob_row)):
+            row[f"Action_{j}_확률(%)"] = prob_row[j]
+        all_prob_records.append(row)
+
+    # ✅ 데이터프레임으로 변환
+    detailed_result_df = pd.DataFrame(all_prob_records)
+
+    # ✅ CSV로 저장
+    output_csv_path = "output/prediction_result_detailed.csv"
+    detailed_result_df.to_csv(output_csv_path, index=False, encoding='utf-8-sig')
+    log_manager.logger.info(f"📁 예측 결과가 CSV로 저장되었습니다: {output_csv_path}")
+
+
+
     # 예시 명령어
     # python main_predict.py --model_path output/ppo_stock_trader_episode_350.pth --test_data data/csv/005930.KS_combined_train_data.csv
-    # python main_predict.py --model_path output/ppo_stock_trader_episode_700.pth --test_data data/csv/005930.KS_combined_test_data.csv
+    # python main_predict.py --model_path output/ppo_stock_trader_episode_1148.pth --test_data data/csv/005930.KS_combined_test_data.csv
