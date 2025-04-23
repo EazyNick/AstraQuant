@@ -118,12 +118,12 @@ class StockTradingEnv(gym.Env):
 
         # 포트폴리오 가치 변화율을 보상으로 설정 (수익률 기반 보상), 단기 수익률 보상
         if self.previous_portfolio_value > 0:
-            short_term_reward = ((new_portfolio_value - self.previous_portfolio_value) / self.previous_portfolio_value) * 100 * 3
+            short_term_reward = ((new_portfolio_value - self.previous_portfolio_value) / self.previous_portfolio_value) * 100 * 2
         else:
             short_term_reward = 0
 
         # 장기적 보상을 반영하도록 강화 (현재 가치 대비 초기 가치)
-        long_term_reward = ((new_portfolio_value - self.initial_balance) / self.initial_balance) * 100 * 1
+        long_term_reward = ((new_portfolio_value - self.initial_balance) / self.initial_balance) * 100 * 4
 
         # 보유 주식 가격 상승 시 추가 보상
         # if self.shares_held > 0 and self.current_step > 0:
