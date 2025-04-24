@@ -123,7 +123,7 @@ class StockTradingEnv(gym.Env):
             short_term_reward = 0
 
         # 장기적 보상을 반영하도록 강화 (현재 가치 대비 초기 가치)
-        long_term_reward = ((new_portfolio_value - self.initial_balance) / self.initial_balance) * 100 * 4
+        long_term_reward = ((new_portfolio_value - self.initial_balance) / self.initial_balance) * 100 * 5
 
         # 보유 주식 가격 상승 시 추가 보상
         # if self.shares_held > 0 and self.current_step > 0:

@@ -44,10 +44,14 @@ def load_stock_data(file_path):
             df[col] = df[col] / 100000.0
 
     # ✅ 남길 컬럼 리스트
+    # selected_columns = close_columns + [
+    #     "D_Slope_SMA_5", "D_Slope_SMA_10", "D_Slope_SMA_15", "D_Slope_SMA_20",
+    #     "W_Slope_SMA_5", "W_Slope_SMA_10",
+    #     "M_Slope_SMA_5"
+    # ]
+
     selected_columns = close_columns + [
         "D_Slope_SMA_5", "D_Slope_SMA_10", "D_Slope_SMA_15", "D_Slope_SMA_20",
-        "W_Slope_SMA_5", "W_Slope_SMA_10",
-        "M_Slope_SMA_5"
     ]
 
     # # ✅ 컬럼 이름 사전 정의
