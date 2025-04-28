@@ -13,6 +13,9 @@ def load_stock_data(file_path):
     Returns:
         tuple: (numpy.ndarray, int) 변환된 데이터와 입력 피처 개수
     """
+
+    skip_initial_days = 21
+
     # ✅ CSV 파일 로드
     df = pd.read_csv(file_path)
 
@@ -68,17 +71,17 @@ def load_stock_data(file_path):
     df = df[selected_columns]
 
     # ✅ 각 Slope 컬럼에 대해 Z-score 정규화 또는 Tanh 변환 적용
-    slope_columns = [col for col in df.columns if "Slope" in col]
+    # slope_columns = [col for col in df.columns if "Slope" in col]
 
-    for col in slope_columns:
-        if col in df.columns:
-            # 방법 1: Z-score 정규화 (평균 0, 표준편차 1)
-            mean = df[col].mean()
-            std = df[col].std()
-            if std != 0:
-                df[col] = (df[col] - mean) / std
-            else:
-                df[col] = 0.0  # 표준편차가 0인 경우 정규화 불가 → 0 처리
+    # for col in slope_columns:
+    #     if col in df.columns:
+    #         # 방법 1: Z-score 정규화 (평균 0, 표준편차 1)
+    #         mean = df[col].mean()
+    #         std = df[col].std()
+    #         if std != 0:
+    #             df[col] = (df[col] - mean) / std
+    #         else:
+    #             df[col] = 0.0  # 표준편차가 0인 경우 정규화 불가 → 0 처리
 
             # 방법 2 (대안): Tanh 정규화
             # df[col] = np.tanh(df[col])
@@ -105,6 +108,9 @@ def load_stock_data(file_path):
 
     # ✅ Numpy 배열로 변환
     data = df.values
+
+    # 초반 20개 행 제거
+    data = data[skip_initial_days:]  # 0~20번 행 제거
 
     # ✅ 입력 피처 개수 반환
     input_dim = data.shape[1]
