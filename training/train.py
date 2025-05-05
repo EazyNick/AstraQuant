@@ -86,16 +86,19 @@ class TrainingManager:
             optimizer_critic (torch.optim.Optimizer): Critic 옵티마이저
             episode (int): 저장할 시점의 에피소드 번호
         """
-        checkpoint = {
-            'actor_state_dict': actor.state_dict(),
-            'critic_state_dict': critic.state_dict(),
-            'optimizer_actor': optimizer_actor.state_dict(),
-            'optimizer_critic': optimizer_critic.state_dict(),
-            'episode': episode,
-            'epsilon': self.epsilon
-        }
-        torch.save(checkpoint, self.checkpoint_path)
-        log_manager.logger.info(f"✅ 체크포인트 저장 완료: {self.checkpoint_path} (Episode {episode}, epsilon: {self.epsilon:.6f})")
+        try:
+            checkpoint = {
+                'actor_state_dict': actor.state_dict(),
+                'critic_state_dict': critic.state_dict(),
+                'optimizer_actor_state_dict': optimizer_actor.state_dict(),
+                'optimizer_critic_state_dict': optimizer_critic.state_dict(),
+                'episode': episode,
+                'epsilon': self.epsilon
+            }
+            torch.save(checkpoint, self.checkpoint_path)
+            log_manager.logger.info(f"✅ 체크포인트 저장 완료: {self.checkpoint_path} (Episode {episode})")
+        except Exception as e:
+            log_manager.logger.error(f"❌ 체크포인트 저장 실패: {e}")
 
     def load_checkpoint(self, actor, critic, optimizer_actor, optimizer_critic, agent=None):
         """
@@ -112,18 +115,23 @@ class TrainingManager:
             int: 마지막 저장된 에피소드 번호. 체크포인트가 없으면 0 반환.
         """
         if os.path.exists(self.checkpoint_path):
-            checkpoint = torch.load(self.checkpoint_path)
-            actor.load_state_dict(checkpoint['actor_state_dict'])
-            critic.load_state_dict(checkpoint['critic_state_dict'])
-            optimizer_actor.load_state_dict(checkpoint['optimizer_actor'])
-            optimizer_critic.load_state_dict(checkpoint['optimizer_critic'])
-            episode = checkpoint['episode']
-            self.epsilon = checkpoint.get('epsilon', self.epsilon)
+            try:
+                checkpoint = torch.load(self.checkpoint_path)
+                actor.load_state_dict(checkpoint['actor_state_dict'])
+                critic.load_state_dict(checkpoint['critic_state_dict'])
+                optimizer_actor.load_state_dict(checkpoint['optimizer_actor_state_dict'])
+                optimizer_critic.load_state_dict(checkpoint['optimizer_critic_state_dict'])
+                episode = checkpoint['episode']
+                self.epsilon = checkpoint.get('epsilon', self.epsilon)
 
-            if agent is not None:
-                agent.epsilon = self.epsilon  # ✅ PPOAgent의 epsilon도 업데이트
+                if agent is not None:
+                    agent.epsilon = self.epsilon
 
-            return episode
+                log_manager.logger.info(f"✅ 체크포인트 로드 완료: {self.checkpoint_path} (Episode {episode})")
+                return episode
+            except Exception as e:
+                log_manager.logger.error(f"❌ 체크포인트 로드 실패: {e}")
+                return 0
         else:
             log_manager.logger.info("⚠️ 체크포인트가 존재하지 않습니다. 새로운 학습을 시작합니다.")
             return 0

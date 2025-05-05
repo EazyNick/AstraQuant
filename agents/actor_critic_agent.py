@@ -31,14 +31,14 @@ class ActorCriticAgent:
         self.actor = actor.to(self.device)
         self.critic = critic.to(self.device)
 
-        self.optimizer_actor = optim.Adam(self.actor.parameters(), lr=config_manager.get_learning_rate())
+        self.optimizer_actor = optim.Adam(self.actor.parameters(), lr=config_manager.get_learning_rate() * 0.5)
         self.optimizer_critic = optim.Adam(self.critic.parameters(), lr=config_manager.get_learning_rate())
 
         self.gamma = config_manager.get_gamma()
         self.clampepsilon = config_manager.get_clampepsilon()
         self.batch_size = config_manager.get_batch_size()
-        self.entropy_coef = 0.01 # 엔트로피 보상 계수, 값을 키울수록 정책이 평평해짐. 0.02 등 값 권장
-        self.temperature = 1.1 # 정책 분포의 날카로움/평평함 조정, 1.0보다 클 경우 더욱 평평해짐(탐험 증가)
+        self.entropy_coef = 0.02 # 엔트로피 보상 계수, 값을 키울수록 정책이 평평해짐. 0.02 등 값 권장
+        self.temperature = 0.9 # 정책 분포의 날카로움/평평함 조정, 1.0보다 클 경우 더욱 평평해짐(탐험 증가)
 
         self.writer = writer
         self.train_step = 0
@@ -126,7 +126,10 @@ class ActorCriticAgent:
         discounted_rewards = torch.tensor(discounted_rewards, dtype=torch.float32).to(self.device)
 
         advantages = discounted_rewards - values # critic이 예측한 values와 실제 return의 차이
-
+        
+        # Advantage 정규화 추가
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+        
         for i in range(0, len(states), self.batch_size):
             b_states = states[i:i+self.batch_size]
             b_actions = actions[i:i+self.batch_size]
