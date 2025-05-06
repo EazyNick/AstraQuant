@@ -82,7 +82,7 @@ class ActorCriticAgent:
                 self.writer.add_scalar(f"Action_Prob/Action_{i}", probs[0, i].item(), self.train_step)
 
         # ✅ 디버깅 로그
-        if self.train_step % 100 == 0:
+        if self.train_step % 500 == 0:
             topk = sorted(enumerate(probs[0].tolist()), key=lambda x: x[1], reverse=True)[:3]
             topk_log = {}
             for idx, val in topk:

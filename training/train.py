@@ -49,6 +49,7 @@ class TrainingManager:
             self.save_path = os.path.join(self.directory, self.filename)
             self.checkpoint_path = os.path.join(self.directory, self.checkpoint_filename)
             self.epsilon = config_manager.get_epsilon()
+            log_manager.logger.info(f"💾 체크포인트 저장 경로: {os.path.abspath(self.directory)}")
             log_manager.logger.debug(f"✅ 모델 저장 경로: {self.save_path}")
 
             os.makedirs(self.directory, exist_ok=True)  # 폴더가 없으면 자동 생성
