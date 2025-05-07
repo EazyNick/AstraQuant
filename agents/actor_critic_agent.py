@@ -72,8 +72,9 @@ class ActorCriticAgent:
             action = random.choice(range(self.action_dim))
         else:
             action = dist.sample().item()
-
+            
         log_prob = dist.log_prob(torch.tensor(action).to(self.device))
+
         self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
 
         # ✅ TensorBoard 기록
@@ -110,14 +111,15 @@ class ActorCriticAgent:
             memory (list): (state, action, reward, log_prob, value) 튜플의 리스트
         """
         """메모리로부터 Advantage 기반 Actor-Critic 업데이트 수행"""
-        states, actions, rewards, log_probs, values = zip(*memory)
+        states, actions, rewards, old_log_probs, values = zip(*memory)
 
         states = torch.tensor(np.array(states), dtype=torch.float32).to(self.device)
         actions = torch.tensor(actions).to(self.device)
         rewards = torch.tensor(rewards).to(self.device)
-        old_log_probs = torch.tensor(log_probs).to(self.device)
+        old_log_probs = torch.tensor(old_log_probs).to(self.device)
         values = torch.tensor(values).to(self.device)
 
+        # Discounted rewards 계산
         discounted_rewards = []
         running_add = 0
         for r in reversed(rewards):
@@ -125,41 +127,44 @@ class ActorCriticAgent:
             discounted_rewards.insert(0, running_add)
         discounted_rewards = torch.tensor(discounted_rewards, dtype=torch.float32).to(self.device)
 
+        # Advantage 계산 
         advantages = discounted_rewards - values # critic이 예측한 values와 실제 return의 차이
-        
-        # Advantage 정규화 추가
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
         
         for i in range(0, len(states), self.batch_size):
             b_states = states[i:i+self.batch_size]
             b_actions = actions[i:i+self.batch_size]
             b_advantages = advantages[i:i+self.batch_size].detach()
-            b_returns = discounted_rewards[i:i+self.batch_size].detach() # 실제 보상 누적 값
+            b_returns = discounted_rewards[i:i+self.batch_size].detach()
             b_old_log_probs = old_log_probs[i:i+self.batch_size].detach()
 
+            # Actor 업데이트
             logits = self.actor(b_states)
             probs = torch.softmax(logits / self.temperature, dim=-1)
             dist = Categorical(probs)
             new_log_probs = dist.log_prob(b_actions)
-
+            
             ratio = torch.exp(new_log_probs - b_old_log_probs)
             clipped_ratio = torch.clamp(ratio, 1 - self.clampepsilon, 1 + self.clampepsilon)
-
+            
             actor_loss = -torch.min(ratio * b_advantages, clipped_ratio * b_advantages).mean() # actor는 advantage 값을 기준으로 확률을 조정
             actor_loss -= self.entropy_coef * dist.entropy().mean()
 
+            # Critic 업데이트
             values_pred = self.critic(b_states).squeeze() # 현재 상태에서 critic이 예측한 값
             critic_loss = nn.MSELoss()(values_pred, b_returns) # 상태의 실제 보상 누적값과 자신이 예측한  V(s)의 차이를 줄이도록 학습
 
+            # Actor 업데이트
             self.optimizer_actor.zero_grad()
             actor_loss.backward()
             self.optimizer_actor.step()
 
+            # Critic 업데이트
             self.optimizer_critic.zero_grad()
             critic_loss.backward()
             self.optimizer_critic.step()
 
-            # ✅ TensorBoard 기록
+            # TensorBoard 기록
             if self.writer:
                 self.writer.add_scalar("Loss/Actor", actor_loss.item(), self.train_step)
                 self.writer.add_scalar("Loss/Critic", critic_loss.item(), self.train_step)
