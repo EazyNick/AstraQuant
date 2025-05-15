@@ -73,7 +73,7 @@ class StockTradingEnv(gym.Env):
     def step(self, action):
         """ 액션을 실행하고 새로운 상태, 보상, 종료 여부 반환 """
         reward = 0
-        price = self.stock_data[self.current_step, 0] * 100000
+        price = self.stock_data[self.current_step, 0] * 1000
         if np.isnan(price) or price <= 0:
             log_manager.logger.warning(f"[Step {self.current_step}] 경고: 유효하지 않은 가격 {price}.")
             return None, 0, True  # 가격이 NaN이면 종료
@@ -127,7 +127,7 @@ class StockTradingEnv(gym.Env):
         # 3. 보유 주식 가격 변화 보상
         holding_reward = 0
         if self.shares_held > 0 and self.current_step > 0:
-            prev_price = self.stock_data[self.current_step - 1, 0] * 100000
+            prev_price = self.stock_data[self.current_step - 1, 0] * 1000
             price_change = (price - prev_price) / prev_price
             holding_reward = price_change * self.shares_held * 0.1
 
@@ -139,7 +139,7 @@ class StockTradingEnv(gym.Env):
         # 5. 보유 주식 수에 따른 리스크 패널티
         risk_penalty = 0
         if self.shares_held > 0:
-            price_volatility = np.std(self.stock_data[max(0, self.current_step-5):self.current_step+1, 0] * 100000)
+            price_volatility = np.std(self.stock_data[max(0, self.current_step-5):self.current_step+1, 0] * 1000)
             risk_penalty = price_volatility * self.shares_held * 0.01
 
         # 최종 보상 계산
