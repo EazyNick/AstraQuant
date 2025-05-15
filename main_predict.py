@@ -121,7 +121,8 @@ if __name__ == "__main__":
     # if model is None:
     #     raise ValueError("모델이 로드되지 않았습니다.")
 
-    df = pd.read_csv(args.test_data or 'data/csv/sp500_test_data.csv')
+    # df = pd.read_csv(args.test_data or 'data/csv/AMZN_test_data.csv')
+    df = pd.read_csv(args.test_data or 'data/cursor_csv/AMZN_test_data.csv')
     df['Date'] = pd.to_datetime(df['Date'])  # 날짜 형식 변환
     df = df.sort_values('Date').reset_index(drop=True)
     dates = df['Date'].values  # 다시 정렬된 날짜로 업데이트

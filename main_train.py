@@ -39,7 +39,8 @@ log_manager.logger.info(f"✅ 학습 장치 설정: {device}")
 
 # ✅ 데이터 로드 (input_dim 자동 추출)
 log_manager.logger.info("데이터 불러오기...")
-stock_prices, input_dim = load_stock_data("data/csv/005930.KS_combined_train_data.csv")
+# stock_prices, input_dim = load_stock_data("data/csv/005930.KS_combined_train_data.csv")
+stock_prices, input_dim = load_stock_data("data/cursor_csv/AMZN_train_data.csv")
 
 # ✅ 기존 텐서보드 로그 삭제
 log_dir = "logs/training"

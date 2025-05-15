@@ -67,7 +67,7 @@ def execute_trading_strategy(stock_data, model, dates, prices, device="cpu"):
     Returns:
         pd.DataFrame: 매매 예측 결과 및 포트폴리오 가치
     """
-    initial_balance = 100000  # 초기 투자금 (USD)
+    initial_balance = 10000000  # 초기 투자금 (USD)
     balance = initial_balance
     shares_held = 0
     transaction_fee = 0.001  # 거래 수수료 0.1%
