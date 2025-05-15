@@ -18,8 +18,8 @@ def load_stock_data(file_path: str) -> tuple[np.ndarray, int]:
 
     # ✅ 'Close' 컬럼이 존재하면 /1000 해줌
     if 'Close' in df.columns:
-        df['Close'] = df['Close'] / 1000.0
-        print("✅ 'Close' 컬럼을 1/1000로 스케일링했습니다.")
+        df['Close'] = df['Close'] / 100.0
+        print("✅ 'Close' 컬럼을 1/100로 스케일링했습니다.")
     else:
         print("⚠️ 'Close' 컬럼이 없습니다. 스케일링 생략.")
 
