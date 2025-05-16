@@ -16,10 +16,12 @@ def load_stock_data(file_path: str) -> tuple[np.ndarray, int]:
     # ✅ CSV 파일 로드
     df = pd.read_csv(file_path)
 
+    close_price_scale = 10.0 # 학습을 위해 현재가 스케일링(나눠줌)
+
     # ✅ 'Close' 컬럼이 존재하면 /1000 해줌
     if 'Close' in df.columns:
-        df['Close'] = df['Close'] / 100.0
-        print("✅ 'Close' 컬럼을 1/100로 스케일링했습니다.")
+        df['Close'] = df['Close'] / close_price_scale
+        print("✅ 'Close' 컬럼을 1/10로 스케일링했습니다.")
     else:
         print("⚠️ 'Close' 컬럼이 없습니다. 스케일링 생략.")
 
@@ -49,8 +51,15 @@ if __name__ == "__main__":
     # ✅ 샘플 CSV 파일 경로 설정
     sample_file = "data/cursor_csv/AMZN_train_data.csv"
 
-    # ✅ 파일이 존재하는지 확인 후 로드
+     # ✅ 파일이 존재하는지 확인 후 로드
     if os.path.exists(sample_file):
+        print(f"📂 CSV 파일 내용 미리보기: {sample_file}")
+        df_preview = pd.read_csv(sample_file)
+        print(df_preview.head(10))  # 처음 10줄 출력
+
+        print("🔍 4번째 열 미리보기:")
+        print(df_preview.iloc[:, 4].head(10))  # 4번째 열만 출력 (0-based index)
+
         stock_data, input_dim = load_stock_data(sample_file)
         print(f"✅ 데이터 로드 완료! 데이터 Shape: {stock_data.shape}, 입력 피처 개수: {input_dim}")
     else:
