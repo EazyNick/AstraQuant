@@ -1,6 +1,7 @@
 # 📈 주식 자동매매 시스템 (PPO + Transformer) (250407 최신화)
 
 ## 📌 프로젝트 개요
+
 본 프로젝트는 **PPO(Proximal Policy Optimization) 강화학습 알고리즘**과 **트랜스포머(Transformer) 기반 신경망**을 활용하여 **주식 자동매매 시스템**을 구현하는 것을 목표로 합니다.
 
 강화학습을 활용하여 **최적의 매매 전략**을 학습하고, 이를 실시간 시장 데이터에 적용하여 **매도(Sell) / 관망(Hold) / 매수(Buy)** 결정을 수행하는 것이 핵심 기능입니다.
@@ -8,7 +9,9 @@
 ---
 
 ## 🚀 모델 개요
+
 ### **1️⃣ PPO (Proximal Policy Optimization)**
+
 본 프로젝트에서는 **PPO 알고리즘을 사용하여 최적의 거래 전략을 학습**합니다. PPO는 정책 기반(Policy Gradient)과 가치 기반(Value Function)을 결합한 Actor-Critic 구조를 사용하여 학습을 진행합니다.
 
 - Actor (정책 네트워크): 주어진 상태에서 최적의 매매 결정을 수행하는 역할
@@ -17,6 +20,7 @@
 - Advantage Estimation을 통해 학습 효율성을 향상
 
 ### **2️⃣ Transformer 기반 신경망**
+
 기존 강화학습 모델에서는 CNN 또는 LSTM을 사용하지만, 본 프로젝트에서는 **트랜스포머 신경망을 활용하여 시계열 데이터를 처리**합니다.
 
 - **자기회귀(Self-Attention) 메커니즘을 활용하여 장기적인 패턴을 학습**
@@ -36,6 +40,7 @@ pip install -r requirements.txt
 ```
 
 ---
+
 ✅ Python 버전: 본 프로젝트는 Python 3.10.16 환경에서 실행됩니다.
 
 ### **2️⃣ 데이터 다운로드**
@@ -43,10 +48,56 @@ pip install -r requirements.txt
 프로젝트를 실행하기 전에 **주식 데이터를 다운로드하여 전처리**해야 합니다.
 
 ```bash
-python data/data_s&p.ipynb
+python data/data_cursor.ipynb
 ```
 
-이 스크립트는 S&P 500 및 개별 주식(AAPL, TSLA 등)의 데이터를 다운로드하고, **학습 데이터(train) 및 테스트 데이터(test)** 로 저장합니다.
+이 스크립트는 다음과 같은 기능을 수행합니다:
+
+#### 📊 데이터 수집 기능
+
+- **기본 가격 데이터**: Open, High, Low, Close, Volume
+- **기술적 지표**:
+  - RSI (상대강도지수)
+  - MACD (이동평균수렴확산지수)
+  - 볼린저 밴드 (BB)
+  - ATR (평균진폭)
+  - CCI (상품채널지수)
+  - MFI (자금흐름지수)
+  - ADX (평균방향지수)
+
+#### 📈 추가 분석 지표
+
+- **가격 패턴**:
+
+  - 이전 고점/저점
+  - 추세선 (20일 기준)
+  - 가격 변동성
+  - 모멘텀
+  - 가격 범위
+
+- **거래량 프로파일**:
+  - 거래량 이동평균 (5일, 20일)
+  - VWAP (거래량가중평균가격)
+  - 거래량 변동성
+  - OBV (온밸런스볼륨)
+  - 거래량 가중 가격
+
+#### ⏰ 시간대별 데이터
+
+- 일별 데이터 (1d)
+- 주별 데이터 (1wk)
+- 월별 데이터 (1mo)
+
+#### 🔄 데이터 전처리
+
+- 모든 지표의 정규화 (MinMaxScaler)
+- 결측치 처리
+- 학습/테스트 데이터 분할
+
+데이터는 `cursor_csv` 디렉토리에 저장되며, 각 종목별로 다음 형식의 파일이 생성됩니다:
+
+- `{종목코드}_train_data.csv`: 학습 데이터
+- `{종목코드}_test_data.csv`: 테스트 데이터
 
 ---
 
@@ -110,7 +161,6 @@ output/model_predictions.csv
 
 - 기타 최적화
 
-
 ## 📌 문의 및 이슈 등록
 
 - 문의: [kkkygsos@naver.com](mailto:kkkygsos@naver.com)
@@ -121,4 +171,3 @@ output/model_predictions.csv
 본 프로젝트는 **Apache License 2.0**을 따릅니다.
 
 자세한 내용은 [LICENSE](http://www.apache.org/licenses/LICENSE-2.0)에서 확인할 수 있습니다.
-
