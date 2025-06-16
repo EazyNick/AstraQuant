@@ -6,7 +6,7 @@ general:
 
 env:
   initial_balance: 10000000 # 초기 잔액
-  observation_window: 10 # 한 번에 입력하는 시계열 길이
+  observation_window: 3 # 한 번에 입력하는 시계열 길이
   transaction_fee: 0.001 # 거래 수수료 (0.1% = 0.001)
   max_shares_per_trade: 400 # 분할 매수, 매도 상한
 
