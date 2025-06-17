@@ -2,6 +2,7 @@ import torch
 import os
 import sys
 from torch.utils.tensorboard import SummaryWriter
+import psutil  # 메모리 모니터링을 위한 라이브러리 추가
 
 current_file = os.path.abspath(__file__) 
 project_root = os.path.abspath(os.path.join(current_file, "..", "..")) # 현재 디렉토리에 따라 이 부분 수정
@@ -137,6 +138,21 @@ class TrainingManager:
             log_manager.logger.info("⚠️ 체크포인트가 존재하지 않습니다. 새로운 학습을 시작합니다.")
             return 0
 
+def check_memory_usage():
+    """메모리 사용량을 확인하고 80% 이상일 때만 경고를 로깅하는 함수"""
+    memory_percent = psutil.virtual_memory().percent
+    if memory_percent >= 80:
+        log_manager.logger.warning(f"⚠️ 시스템 메모리 사용량이 높습니다: {memory_percent:.1f}%")
+        # GPU 메모리도 확인 (CUDA가 사용 가능하고 실제로 GPU를 사용하는 경우)
+        if torch.cuda.is_available() and torch.cuda.is_initialized():
+            gpu_memory_allocated = torch.cuda.memory_allocated() / 1024**2  # MB
+            gpu_memory_total = torch.cuda.get_device_properties(0).total_memory / 1024**2  # MB
+            gpu_memory_percent = (gpu_memory_allocated / gpu_memory_total) * 100
+            log_manager.logger.warning(f"⚠️ GPU 메모리 사용량: {gpu_memory_allocated:.1f}MB / {gpu_memory_total:.1f}MB ({gpu_memory_percent:.1f}%)")
+        else:
+            log_manager.logger.warning("💡 GPU를 사용하지 않고 CPU를 사용 중입니다.")
+    return memory_percent
+
 def train_agent(env, agent, episodes, training_manager):
     """ PPO 에이전트를 학습시키는 함수 
     
@@ -153,6 +169,9 @@ def train_agent(env, agent, episodes, training_manager):
     best_reward = float('-inf')  # 최고 리워드 기록 초기화
 
     for episode in range(start_episode, episodes):
+        # 메모리 사용량 확인 (80% 이상일 때만 경고 로그 출력)
+        check_memory_usage()
+        
         state = env.reset()
         memory = []
         total_reward = 0
