@@ -28,6 +28,21 @@ def load_stock_data(file_path: str) -> tuple[np.ndarray, int]:
     # ✅ Date 컬럼 제외
     df = df.drop('Date', axis=1)
 
+    # ✅ NaN 값 체크 및 제거
+    nan_count = df.isnull().sum().sum()
+    if nan_count > 0:
+        print(f"⚠️ 데이터에 {nan_count}개의 NaN 값이 발견되었습니다. 제거합니다.")
+        df = df.dropna()
+        print(f"✅ NaN 제거 후 데이터 형태: {df.shape}")
+
+    # ✅ 무한대 값 체크 및 제거
+    inf_count = np.isinf(df.values).sum()
+    if inf_count > 0:
+        print(f"⚠️ 데이터에 {inf_count}개의 무한대 값이 발견되었습니다. 제거합니다.")
+        df = df.replace([np.inf, -np.inf], np.nan)
+        df = df.dropna()
+        print(f"✅ 무한대 값 제거 후 데이터 형태: {df.shape}")
+
     # ✅ 모든 컬럼을 float32로 변환
     for col in df.columns:
         df[col] = df[col].astype('float32')
@@ -58,7 +73,7 @@ if __name__ == "__main__":
         print(df_preview.head(10))  # 처음 10줄 출력
 
         print("🔍 4번째 열 미리보기:")
-        print(df_preview.iloc[:, 4].head(10))  # 4번째 열만 출력 (0-based index)
+        print(df_preview.iloc[:, 0].head(10))  # 4번째 열만 출력 (0-based index)
 
         stock_data, input_dim = load_stock_data(sample_file)
         print(f"✅ 데이터 로드 완료! 데이터 Shape: {stock_data.shape}, 입력 피처 개수: {input_dim}")

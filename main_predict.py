@@ -140,8 +140,8 @@ if __name__ == "__main__":
     # action_dict 생성
     action_dict[0] = "관망(Hold)"
     for i in range(1, max_volume + 1):
-        action_dict[i] = f"매수(Buy) {i}주"
-        action_dict[i + max_volume] = f"매도(Sell) {i}주"
+        action_dict[i] = f"매수(Buy) {i * 30}주"  # 30배로 수정
+        action_dict[i + max_volume] = f"매도(Sell) {i * 30}주"  # 30배로 수정
 
     predictions = []
     probs_list = []  # ✅ 확률 리스트 저장용
@@ -163,18 +163,20 @@ if __name__ == "__main__":
         probs_list.append(probs[0])  # ✅ 확률 분포 저장
 
 
-        # ✅ 보유 수량 업데이트
+        # ✅ 보유 수량 업데이트 (30배로 수정)
         if 1 <= action <= max_volume: # 매수
-            cost = action * current_price * (1 + transaction_fee)
+            shares_to_buy = action * 30  # 30배로 수정
+            cost = shares_to_buy * current_price * (1 + transaction_fee)
             if cost <= balance:
-                holding += action
+                holding += shares_to_buy
                 balance -= cost
                 print(f"매수: {holding}주")
         elif max_volume < action <= 2 * max_volume: # 매도
-            sell_volume = min(holding, action - max_volume)
-            revenue = sell_volume * current_price * (1 - transaction_fee)
+            shares_to_sell = (action - max_volume) * 30  # 30배로 수정
+            shares_to_sell = min(shares_to_sell, holding)
+            revenue = shares_to_sell * current_price * (1 - transaction_fee)
             balance += revenue
-            holding -= sell_volume
+            holding -= shares_to_sell
             print(f"매도: {holding}주")
 
     # ✅ 데이터프레임으로 변환 및 출력
