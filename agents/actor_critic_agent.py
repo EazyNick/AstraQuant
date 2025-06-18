@@ -92,10 +92,10 @@ class ActorCriticAgent:
                     action_info = f"{action_type}"
                 elif 1 <= idx <= self.max_shares_per_trade:
                     action_type = "매수"
-                    action_info = f"{action_type}({idx}주)"
+                    action_info = f"{action_type}({idx * 30}주)"
                 else:
                     action_type = "매도"
-                    action_info = f"{action_type}({idx - self.max_shares_per_trade}주)"
+                    action_info = f"{action_type}({(idx - self.max_shares_per_trade) * 30}주)"
                 topk_log[f"Action_{idx}"] = f"{val:.4f} → {action_info}"
             log_manager.logger.debug(f"{self.train_step} step Top-3 probs:\n{topk_log}")
 
@@ -157,11 +157,13 @@ class ActorCriticAgent:
             # Actor 업데이트
             self.optimizer_actor.zero_grad()
             actor_loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1.0)
             self.optimizer_actor.step()
 
             # Critic 업데이트
             self.optimizer_critic.zero_grad()
             critic_loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=1.0)
             self.optimizer_critic.step()
 
             # TensorBoard 기록

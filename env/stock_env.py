@@ -85,8 +85,8 @@ class StockTradingEnv(gym.Env):
             pass
 
         elif 1 <= action <= self.max_shares_per_trade: 
-            # 매수 (Buy)
-            shares_to_buy = action # action개 만큼 매수
+            # 매수 (Buy) - action * 30주 만큼 매수
+            shares_to_buy = action * 30  # 액션 값에 30을 곱함
             cost = shares_to_buy * price * (1 + self.transaction_fee)  # 거래 수수료 포함
             if cost <= self.balance:  # 잔고가 충분한 경우에만 매수
                 self.shares_held += shares_to_buy
@@ -95,9 +95,9 @@ class StockTradingEnv(gym.Env):
                 reward -= 0.1  # 매수 실패 패널티 감소
 
         elif self.max_shares_per_trade < action <= 2 * self.max_shares_per_trade:
-            # 매도 (Sell)
+            # 매도 (Sell) - (action - max_shares_per_trade) * 30주 만큼 매도
             if self.shares_held > 0: 
-                shares_to_sell = action - self.max_shares_per_trade
+                shares_to_sell = (action - self.max_shares_per_trade) * 30  # 액션 값에 30을 곱함
                 shares_to_sell = min(shares_to_sell, self.shares_held)
                 revenue = shares_to_sell * price * (1 - self.transaction_fee)  # 거래 수수료 포함
                 self.balance += revenue
