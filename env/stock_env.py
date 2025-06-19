@@ -42,7 +42,7 @@ class StockTradingEnv(gym.Env):
         self.balance = self.initial_balance
         self.shares_held = 0 # 보유 주식 수
         self.max_shares_scaling = 10000  # 보유 주식 수 정규화를 위한 스케일링(나눠줌)
-        self.close_price_scale = 10  # 'Close' 값을 원래 가격으로 복원할 때 사용할 스케일
+        self.close_price_scale = 1000000  # 'Close' 값을 원래 가격으로 복원할 때 사용할 스케일
         self.previous_portfolio_value = self.initial_balance 
         
         self.max_shares_per_trade = config_manager.get_max_shares_per_trade()
@@ -124,7 +124,7 @@ class StockTradingEnv(gym.Env):
             short_term_reward = ((new_portfolio_value - self.previous_portfolio_value) / self.previous_portfolio_value) * 10
 
         # 2. 장기 수익률 보상 (현재 가치 대비 초기 가치)
-        long_term_reward = ((new_portfolio_value - self.initial_balance) / self.initial_balance) * 10
+        long_term_reward = ((new_portfolio_value - self.initial_balance) / self.initial_balance) * 12
 
         # 3. 보유 주식 가격 변화 보상
         holding_reward = 0
