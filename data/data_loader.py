@@ -16,7 +16,7 @@ def load_stock_data(file_path: str) -> tuple[np.ndarray, int]:
     # ✅ CSV 파일 로드
     df = pd.read_csv(file_path)
 
-    close_price_scale = 10.0 # 학습을 위해 현재가 스케일링(나눠줌)
+    close_price_scale = 1000000.0 # 학습을 위해 현재가 스케일링(나눠줌)
 
     # ✅ 'Close' 컬럼이 존재하면 /1000 해줌
     if 'Close' in df.columns:

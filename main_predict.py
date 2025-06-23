@@ -159,7 +159,7 @@ if __name__ == "__main__":
         date = dates[i] # 해당 날짜 가져오기
         action, probs = predict_action(actor_model, state_with_holding, device)
         predictions.append([date, action_dict[action], probs[0][action]])
-        current_price = stock_data[i, 0] * 10 
+        current_price = stock_data[i, 0] * 1000000 
         probs_list.append(probs[0])  # ✅ 확률 분포 저장
 
 
