@@ -41,13 +41,11 @@ class StockTradingEnv(gym.Env):
         self.current_step = 0
         self.balance = self.initial_balance
         self.shares_held = 0 # 보유 주식 수
-        self.max_shares_scaling = 10000  # 보유 주식 수 정규화를 위한 스케일링(나눠줌)
         self.close_price_scale = 100  # 'Close' 값을 원래 가격으로 복원할 때 사용할 스케일
-        self.previous_portfolio_value = self.initial_balance 
+        self.previous_portfolio_value = self.initial_balance
         
         # 🔥 주식 보유량 스케일링 개선
         self.max_shares_per_trade = config_manager.get_max_shares_per_trade()
-        self.max_possible_shares = self.max_shares_per_trade * 30 * 10  # 최대 가능한 보유 주식 수 (매수 10회 가정)
         self.shares_scaling_factor = config_manager.get_shares_scaling_factor()  # 설정에서 가져오기
         
         self.close_price_scale = 10  # 'Close' 값을 원래 가격으로 복원할 때 사용할 스케일 (data_loader에서 /10 했으므로 *10으로 복원)
@@ -246,7 +244,6 @@ class StockTradingEnv(gym.Env):
                 f"  - 실제 보유 주식 수: {self.shares_held} (정수)\n"
                 f"  - 스케일된 보유 주식 수: {scaled_shares:.4f} (학습용)\n"
                 # f"  - 스케일링 팩터: {self.shares_scaling_factor}\n"
-                f"  - 최대 가능 보유 주식 수: {self.max_possible_shares}"
             )
 
         # log_manager.logger.debug(f"Step: {self.current_step}, Action: {['Sell', 'Hold', 'Buy'][action]}, Reward: {reward}, Portfolio: {new_portfolio_value}, Shares Held: {self.shares_held}")
