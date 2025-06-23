@@ -42,7 +42,7 @@ class StockTradingEnv(gym.Env):
         self.balance = self.initial_balance
         self.shares_held = 0 # 보유 주식 수
         self.max_shares_scaling = 10000  # 보유 주식 수 정규화를 위한 스케일링(나눠줌)
-        self.close_price_scale = 1000000  # 'Close' 값을 원래 가격으로 복원할 때 사용할 스케일
+        self.close_price_scale = 100  # 'Close' 값을 원래 가격으로 복원할 때 사용할 스케일
         self.previous_portfolio_value = self.initial_balance 
         
         # 🔥 주식 보유량 스케일링 개선
