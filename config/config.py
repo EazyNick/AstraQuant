@@ -83,7 +83,13 @@ class ConfigManager:
         return self.config["env"].get("transaction_fee", 0.001)  # 기본값 설정
 
     def get_max_shares_per_trade(self):
-        return self.config["env"].get("max_shares_per_trade", 10)  # 기본값 10
+        """분할 매수, 매도 상한 반환"""
+        return self.config['env']['max_shares_per_trade']
+    
+    def get_shares_scaling_factor(self):
+        """주식 보유량 학습용 스케일링 팩터 반환"""
+        return self.config['env'].get('shares_scaling_factor', 1000)  # 기본값 1000
+
     ## =============================== ##
     ##        Training 설정 Getter     ##
     ## =============================== ##

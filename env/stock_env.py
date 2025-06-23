@@ -45,7 +45,14 @@ class StockTradingEnv(gym.Env):
         self.close_price_scale = 1000000  # 'Close' 값을 원래 가격으로 복원할 때 사용할 스케일
         self.previous_portfolio_value = self.initial_balance 
         
+        # 🔥 주식 보유량 스케일링 개선
         self.max_shares_per_trade = config_manager.get_max_shares_per_trade()
+        self.max_possible_shares = self.max_shares_per_trade * 30 * 10  # 최대 가능한 보유 주식 수 (매수 10회 가정)
+        self.shares_scaling_factor = config_manager.get_shares_scaling_factor()  # 설정에서 가져오기
+        
+        self.close_price_scale = 10  # 'Close' 값을 원래 가격으로 복원할 때 사용할 스케일 (data_loader에서 /10 했으므로 *10으로 복원)
+        self.previous_portfolio_value = self.initial_balance 
+        
         self.action_space = spaces.Discrete(1 + 2 * self.max_shares_per_trade)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.observation_window, self.feature_dim), dtype=np.float32)
 
@@ -58,16 +65,31 @@ class StockTradingEnv(gym.Env):
         sign = torch.sign(value)  # 값의 부호 유지
         return sign * torch.log1p(abs(value) / scale) * scale  # log(1 + |value|) 방식
 
+    def normalize_shares_for_learning(self, shares_held):
+        """
+        주식 보유량을 학습용 소수점 스케일로 변환
+        
+        Args:
+            shares_held (int): 실제 보유 주식 수 (정수)
+            
+        Returns:
+            float: 학습용 스케일된 주식 보유량 (0.XXX 형태)
+        """
+        return shares_held / self.shares_scaling_factor
+
     def reset(self):
         """ 환경을 초기화하고 초기 상태를 반환 """
         self.current_step = 0
         self.balance = self.initial_balance
-        self.shares_held = 0
+        self.shares_held = 0  # 정수값으로 초기화
         self.previous_portfolio_value = self.initial_balance 
 
         # 🔹 기존 상태 (주가 데이터) + 보유 주식 수 추가
         state = self.stock_data[self.current_step:self.current_step + self.observation_window]
-        shares_held_feature = np.full((self.observation_window, 1), self.shares_held)  # 보유 주식수를 feature로 추가
+        
+        # 🔥 주식 보유량을 학습용 스케일로 변환
+        scaled_shares = self.normalize_shares_for_learning(self.shares_held)
+        shares_held_feature = np.full((self.observation_window, 1), scaled_shares)  # 스케일된 보유 주식수를 feature로 추가
         state_with_shares = np.hstack((state, shares_held_feature))  # 상태 확장
         
         return state_with_shares
@@ -88,11 +110,27 @@ class StockTradingEnv(gym.Env):
             # 매수 (Buy) - action * 30주 만큼 매수
             shares_to_buy = action * 30  # 액션 값에 30을 곱함
             cost = shares_to_buy * price * (1 + self.transaction_fee)  # 거래 수수료 포함
+            
+            # 🔥 디버깅: 매수 시도 상황 로그
+            if self.train_step % 1000 == 0:  # 1000 스텝마다만 출력
+                log_manager.logger.debug(
+                    f"[Step {self.current_step}] 매수 시도:\n"
+                    f"  - 액션: {action} (매수 {shares_to_buy}주)\n"
+                    f"  - 현재 가격: {price:,.0f}원\n"
+                    f"  - 필요 비용: {cost:,.0f}원\n"
+                    f"  - 현재 잔고: {self.balance:,.0f}원\n"
+                    f"  - 매수 가능: {'예' if cost <= self.balance else '아니오'}"
+                )
+            
             if cost <= self.balance:  # 잔고가 충분한 경우에만 매수
                 self.shares_held += shares_to_buy
                 self.balance -= cost
+                if self.train_step % 1000 == 0:
+                    log_manager.logger.debug(f"  - 매수 성공! 보유 주식: {self.shares_held}주, 잔고: {self.balance:,.0f}원")
             else:
-                reward -= 0.1  # 매수 실패 패널티 감소
+                reward -= 0.0001 * self.shares_held  # 매수 실패 패널티 감소
+                if self.train_step % 1000 == 0:
+                    log_manager.logger.debug(f"  - 매수 실패! 잔고 부족")
 
         elif self.max_shares_per_trade < action <= 2 * self.max_shares_per_trade:
             # 매도 (Sell) - (action - max_shares_per_trade) * 30주 만큼 매도
@@ -102,8 +140,20 @@ class StockTradingEnv(gym.Env):
                 revenue = shares_to_sell * price * (1 - self.transaction_fee)  # 거래 수수료 포함
                 self.balance += revenue
                 self.shares_held -= shares_to_sell # 매도한만큼 주식수량 조정
+                
+                # 🔥 디버깅: 매도 성공 로그
+                if self.train_step % 1000 == 0:
+                    log_manager.logger.debug(
+                        f"[Step {self.current_step}] 매도 성공:\n"
+                        f"  - 액션: {action} (매도 {shares_to_sell}주)\n"
+                        f"  - 매도 수익: {revenue:,.0f}원\n"
+                        f"  - 보유 주식: {self.shares_held}주\n"
+                        f"  - 잔고: {self.balance:,.0f}원"
+                    )
             else:
-                reward -= 0.1  # 매도 실패 패널티 감소
+                reward -= 0.01  # 매도 실패 패널티 증가 (보유 주식이 없는데 매도하려 할 때)
+                if self.train_step % 1000 == 0:
+                    log_manager.logger.debug(f"[Step {self.current_step}] 매도 실패! 보유 주식 없음")
 
         self.current_step += 1
         done = self.current_step >= len(self.stock_data) - self.observation_window
@@ -116,36 +166,46 @@ class StockTradingEnv(gym.Env):
         short_term_reward = 0
         long_term_reward = 0
         holding_reward = 0
+        risk_penalty = 0
+        transaction_penalty = 0
+        holding_encouragement = 0
+        sell_failure_penalty = 0
         future_reward = 0
         future_return = 0
 
         # 포트폴리오 가치 변화율을 보상으로 설정 (수익률 기반 보상), 단기 수익률 보상
         if self.previous_portfolio_value > 0:
-            short_term_reward = ((new_portfolio_value - self.previous_portfolio_value) / self.previous_portfolio_value) * 10
+            short_term_reward = ((new_portfolio_value - self.previous_portfolio_value) / self.previous_portfolio_value) * 12
 
         # 2. 장기 수익률 보상 (현재 가치 대비 초기 가치)
         long_term_reward = ((new_portfolio_value - self.initial_balance) / self.initial_balance) * 12
 
         # 3. 보유 주식 가격 변화 보상
-        holding_reward = 0
         if self.shares_held > 0 and self.current_step > 0:
             prev_price = self.stock_data[self.current_step - 1, 0] * self.close_price_scale
             price_change = (price - prev_price) / prev_price
             holding_reward = price_change * self.shares_held * 0.1
 
         # 4. 거래 수수료 패널티
-        transaction_penalty = 0
+        
         if action > 0:  # 매수나 매도 행동을 했을 때
-            transaction_penalty = -self.transaction_fee * 0.1
+            transaction_penalty = -self.transaction_fee * 0.01
 
         # 5. 보유 주식 수에 따른 리스크 패널티
-        risk_penalty = 0
         if self.shares_held > 0:
             price_volatility = np.std(self.stock_data[max(0, self.current_step-5):self.current_step+1, 0] * self.close_price_scale)
-            risk_penalty = price_volatility * self.shares_held * 0.01
+            risk_penalty = price_volatility * self.shares_held * 0.001  # 리스크 패널티 크게 감소
+
+        # 6. 보유 주식 장려 보상 (새로 추가)
+        if self.shares_held > 0:
+            holding_encouragement = 0.001 * self.shares_held  # 보유 주식 수에 비례한 보상
+
+        # 7. 매도 실패 패널티 증가 (보유 주식이 없는데 매도하려 할 때)
+        if self.max_shares_per_trade < action <= 2 * self.max_shares_per_trade and self.shares_held == 0:
+            sell_failure_penalty = -0.01  # 매도 실패 패널티 증가
 
         # 최종 보상 계산
-        reward = short_term_reward + long_term_reward + holding_reward + transaction_penalty - risk_penalty
+        reward = short_term_reward + long_term_reward + holding_reward + transaction_penalty - risk_penalty + holding_encouragement + sell_failure_penalty
         self.total_reward += reward
 
         # TensorBoard 기록
@@ -172,11 +232,22 @@ class StockTradingEnv(gym.Env):
 
         # 가장 오래된 값을 제거하고, 새로운 보유 주식 수 추가
         self.shares_held_history = np.roll(self.shares_held_history, shift=-1)
-        self.shares_held_history[-1] = self.shares_held / self.max_shares_scaling # 최신 보유 주식 수 업데이트
+        scaled_shares = self.normalize_shares_for_learning(self.shares_held)  # 🔥 스케일된 값으로 업데이트
+        self.shares_held_history[-1] = scaled_shares
 
         # 과거 보유 주식 수 기록을 상태와 함께 결합
         shares_held_feature = self.shares_held_history.reshape(-1, 1)  # (observation_window, 1)
         next_state_with_shares = np.hstack((next_state, shares_held_feature))
+
+        # 🔥 디버깅: 주식 보유량 스케일링 확인 (1000 스텝마다)
+        if self.train_step % 1000 == 0:
+            log_manager.logger.debug(
+                f"[Step {self.current_step}] 주식 보유량 스케일링 확인:\n"
+                f"  - 실제 보유 주식 수: {self.shares_held} (정수)\n"
+                f"  - 스케일된 보유 주식 수: {scaled_shares:.4f} (학습용)\n"
+                # f"  - 스케일링 팩터: {self.shares_scaling_factor}\n"
+                f"  - 최대 가능 보유 주식 수: {self.max_possible_shares}"
+            )
 
         # log_manager.logger.debug(f"Step: {self.current_step}, Action: {['Sell', 'Hold', 'Buy'][action]}, Reward: {reward}, Portfolio: {new_portfolio_value}, Shares Held: {self.shares_held}")
 

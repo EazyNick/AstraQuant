@@ -6,9 +6,10 @@ general:
 
 env:
   initial_balance: 10000000 # 초기 잔액
-  observation_window: 3 # 한 번에 입력하는 시계열 길이
+  observation_window: 5 # 한 번에 입력하는 시계열 길이
   transaction_fee: 0.001 # 거래 수수료 (0.1% = 0.001)
   max_shares_per_trade: 10 # 분할 매수, 매도 상한 (실제 ACTION은 *30 만큼 해서 진행, ACTION SPACE 설정임)
+  shares_scaling_factor: 10000 # 주식 보유량 학습용 스케일링 팩터 (0.XXX 형태로 변환)
 
 training:
   episodes: 10000 # 학습 에피소드 수
