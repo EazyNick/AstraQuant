@@ -36,20 +36,23 @@ class StockTradingEnv(gym.Env):
         self.initial_balance = config_manager.get_initial_balance()
         self.observation_window = config_manager.get_observation_window()
         self.transaction_fee = config_manager.get_transaction_fee() 
-        self.feature_dim = stock_data.shape[1] # 입력 데이터의 feature 개수 자동 설정
-        self.stock_data = stock_data
+        
+        # 🔥 Close 가격을 별도로 보관 (포트폴리오 계산용)
+        self.close_prices = stock_data[:, 0]  # Close 가격만 별도 보관
+        
+        # 🔥 Close를 제외한 학습용 데이터 생성
+        self.stock_data = np.delete(stock_data, 0, axis=1)  # 첫 번째 컬럼(Close) 제거
+        
+        self.feature_dim = self.stock_data.shape[1] # Close 제외한 feature 개수
         self.current_step = 0
         self.balance = self.initial_balance
         self.shares_held = 0 # 보유 주식 수
-        self.close_price_scale = 100  # 'Close' 값을 원래 가격으로 복원할 때 사용할 스케일
+        self.close_price_scale = 10  # 'Close' 값을 원래 가격으로 복원할 때 사용할 스케일
         self.previous_portfolio_value = self.initial_balance
         
         # 🔥 주식 보유량 스케일링 개선
         self.max_shares_per_trade = config_manager.get_max_shares_per_trade()
         self.shares_scaling_factor = config_manager.get_shares_scaling_factor()  # 설정에서 가져오기
-        
-        self.close_price_scale = 10  # 'Close' 값을 원래 가격으로 복원할 때 사용할 스케일 (data_loader에서 /10 했으므로 *10으로 복원)
-        self.previous_portfolio_value = self.initial_balance 
         
         self.action_space = spaces.Discrete(1 + 2 * self.max_shares_per_trade)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.observation_window, self.feature_dim), dtype=np.float32)
@@ -95,7 +98,7 @@ class StockTradingEnv(gym.Env):
     def step(self, action):
         """ 액션을 실행하고 새로운 상태, 보상, 종료 여부 반환 """
         reward = 0
-        price = self.stock_data[self.current_step, 0] * self.close_price_scale
+        price = self.close_prices[self.current_step] * self.close_price_scale  # 별도 보관된 Close 가격 사용
         if np.isnan(price) or price <= 0:
             log_manager.logger.warning(f"[Step {self.current_step}] 경고: 유효하지 않은 가격 {price}.")
             return None, 0, True  # 가격이 NaN이면 종료
@@ -124,7 +127,8 @@ class StockTradingEnv(gym.Env):
                 self.shares_held += shares_to_buy
                 self.balance -= cost
                 if self.train_step % 1000 == 0:
-                    log_manager.logger.debug(f"  - 매수 성공! 보유 주식: {self.shares_held}주, 잔고: {self.balance:,.0f}원")
+                    portfolio_value = self.balance + (self.shares_held * price)
+                    log_manager.logger.debug(f"  - 매수 성공! 보유 주식: {self.shares_held}주, 잔고: {self.balance:,.0f}원, 포트폴리오 밸류: {portfolio_value:,.0f}원")
             else:
                 reward -= 0.0001 * self.shares_held  # 매수 실패 패널티 감소
                 if self.train_step % 1000 == 0:
@@ -141,12 +145,14 @@ class StockTradingEnv(gym.Env):
                 
                 # 🔥 디버깅: 매도 성공 로그
                 if self.train_step % 1000 == 0:
+                    portfolio_value = self.balance + (self.shares_held * price)
                     log_manager.logger.debug(
                         f"[Step {self.current_step}] 매도 성공:\n"
                         f"  - 액션: {action} (매도 {shares_to_sell}주)\n"
                         f"  - 매도 수익: {revenue:,.0f}원\n"
                         f"  - 보유 주식: {self.shares_held}주\n"
-                        f"  - 잔고: {self.balance:,.0f}원"
+                        f"  - 잔고: {self.balance:,.0f}원\n"
+                        f"  - 포트폴리오 밸류: {portfolio_value:,.0f}원"
                     )
             else:
                 reward -= 0.01  # 매도 실패 패널티 증가 (보유 주식이 없는데 매도하려 할 때)
@@ -167,7 +173,6 @@ class StockTradingEnv(gym.Env):
         risk_penalty = 0
         transaction_penalty = 0
         holding_encouragement = 0
-        sell_failure_penalty = 0
         future_reward = 0
         future_return = 0
 
@@ -176,34 +181,29 @@ class StockTradingEnv(gym.Env):
             short_term_reward = ((new_portfolio_value - self.previous_portfolio_value) / self.previous_portfolio_value) * 12
 
         # 2. 장기 수익률 보상 (현재 가치 대비 초기 가치)
-        long_term_reward = ((new_portfolio_value - self.initial_balance) / self.initial_balance) * 12
+        long_term_reward = ((new_portfolio_value - self.initial_balance) / self.initial_balance) * 10
 
         # 3. 보유 주식 가격 변화 보상
         if self.shares_held > 0 and self.current_step > 0:
-            prev_price = self.stock_data[self.current_step - 1, 0] * self.close_price_scale
+            prev_price = self.close_prices[self.current_step - 1] * self.close_price_scale  # 별도 보관된 Close 가격 사용
             price_change = (price - prev_price) / prev_price
             holding_reward = price_change * self.shares_held * 0.1
 
         # 4. 거래 수수료 패널티
-        
         if action > 0:  # 매수나 매도 행동을 했을 때
             transaction_penalty = -self.transaction_fee * 0.01
 
         # 5. 보유 주식 수에 따른 리스크 패널티
         if self.shares_held > 0:
-            price_volatility = np.std(self.stock_data[max(0, self.current_step-5):self.current_step+1, 0] * self.close_price_scale)
+            price_volatility = np.std(self.close_prices[max(0, self.current_step-5):self.current_step+1] * self.close_price_scale)
             risk_penalty = price_volatility * self.shares_held * 0.001  # 리스크 패널티 크게 감소
 
         # 6. 보유 주식 장려 보상 (새로 추가)
         if self.shares_held > 0:
             holding_encouragement = 0.001 * self.shares_held  # 보유 주식 수에 비례한 보상
 
-        # 7. 매도 실패 패널티 증가 (보유 주식이 없는데 매도하려 할 때)
-        if self.max_shares_per_trade < action <= 2 * self.max_shares_per_trade and self.shares_held == 0:
-            sell_failure_penalty = -0.01  # 매도 실패 패널티 증가
-
         # 최종 보상 계산
-        reward = short_term_reward + long_term_reward + holding_reward + transaction_penalty - risk_penalty + holding_encouragement + sell_failure_penalty
+        reward = short_term_reward + long_term_reward + holding_reward + transaction_penalty - risk_penalty + holding_encouragement
         self.total_reward += reward
 
         # TensorBoard 기록
