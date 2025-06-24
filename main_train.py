@@ -53,8 +53,8 @@ writer = SummaryWriter(log_dir=log_dir)
 
 # ✅ 환경 및 모델 생성 (config.yaml에서 설정값 자동 적용)
 env = StockTradingEnv(stock_prices, writer=writer)
-actor = ActorNetwork(input_dim=input_dim)
-critic = CriticNetwork(input_dim=input_dim)
+actor = ActorNetwork(input_dim=input_dim)  # 보유 주식수 feature 포함
+critic = CriticNetwork(input_dim=input_dim)  # 보유 주식수 feature 포함
 agent = ActorCriticAgent(actor, critic, writer=writer)
 # ✅ 정확한 입력 피처 개수 로그 출력 (보유 주식 수 포함된 input_dim)
 log_manager.logger.info(f"📐 모델 입력 피처 개수 (보유 수량 포함): {input_dim + 1}")
