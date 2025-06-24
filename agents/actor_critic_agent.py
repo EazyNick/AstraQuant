@@ -61,6 +61,18 @@ class ActorCriticAgent:
         """현재 상태에서 액터를 통해 행동을 선택하고 크리틱의 상태 가치를 함께 반환"""
         state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(self.device)
 
+        # 🔥 보유 주식수 feature 확인 로그 (1000 스텝마다)
+        if self.train_step % 1000 == 0:
+            log_manager.logger.debug(
+                f"[Agent] State 확인:\n"
+                f"  - State shape: {state.shape}\n"
+                f"  - State tensor shape: {state_tensor.shape}\n"
+                f"  - 마지막 feature (보유 주식수): {state[:, -1]}\n"
+                f"  - 보유 주식수 평균: {state[:, -1].mean():.4f}\n"
+                f"  - 보유 주식수 최대: {state[:, -1].max():.4f}\n"
+                f"  - 보유 주식수 최소: {state[:, -1].min():.4f}"
+            )
+
         if not torch.isfinite(state_tensor).all():
             print("⚠️ Invalid state detected:", state_tensor)
 

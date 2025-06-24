@@ -94,6 +94,17 @@ class StockTradingEnv(gym.Env):
         shares_held_feature = np.full((self.observation_window, 1), scaled_shares)  # 스케일된 보유 주식수를 feature로 추가
         state_with_shares = np.hstack((state, shares_held_feature))  # 상태 확장
         
+        # 🔥 디버깅: 보유 주식수 feature 확인
+        log_manager.logger.debug(
+            f"[Reset] 보유 주식수 feature 확인:\n"
+            f"  - 원본 state shape: {state.shape}\n"
+            f"  - 보유 주식수: {self.shares_held}주\n"
+            f"  - 스케일된 보유 주식수: {scaled_shares:.4f}\n"
+            f"  - shares_held_feature shape: {shares_held_feature.shape}\n"
+            f"  - 최종 state_with_shares shape: {state_with_shares.shape}\n"
+            f"  - 마지막 feature 값들: {state_with_shares[:, -1]}"
+        )
+        
         return state_with_shares
 
     def step(self, action):
@@ -269,7 +280,11 @@ class StockTradingEnv(gym.Env):
                 f"[Step {self.current_step}] 주식 보유량 스케일링 확인:\n"
                 f"  - 실제 보유 주식 수: {self.shares_held} (정수)\n"
                 f"  - 스케일된 보유 주식 수: {scaled_shares:.4f} (학습용)\n"
-                # f"  - 스케일링 팩터: {self.shares_scaling_factor}\n"
+                f"  - shares_held_history: {self.shares_held_history}\n"
+                f"  - shares_held_feature shape: {shares_held_feature.shape}\n"
+                f"  - next_state shape: {next_state.shape}\n"
+                f"  - next_state_with_shares shape: {next_state_with_shares.shape}\n"
+                f"  - 마지막 feature 값들: {next_state_with_shares[:, -1]}"
             )
 
         # log_manager.logger.debug(f"Step: {self.current_step}, Action: {['Sell', 'Hold', 'Buy'][action]}, Reward: {reward}, Portfolio: {new_portfolio_value}, Shares Held: {self.shares_held}")

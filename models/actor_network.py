@@ -14,7 +14,7 @@ class ActorNetwork(nn.Module):
 
         self.max_shares_per_trade = config_manager.get_max_shares_per_trade()
         self.action_dim = 1 + 2 * self.max_shares_per_trade
-        self.input_dim = input_dim + 1  # 보유 주식 수 포함
+        self.input_dim = input_dim  # main_train.py에서 이미 input_dim + 1을 전달함
 
         self.embedding = nn.Linear(self.input_dim, model_dim).to(self.device)
         self.positional_encoding = PositionalEncoding(model_dim).to(self.device)
@@ -28,6 +28,19 @@ class ActorNetwork(nn.Module):
         if x.dim() == 2:
             x = x.unsqueeze(0)
         x = x.to(self.device)
+        
+        # 🔥 입력 데이터 확인 로그 (1000 스텝마다)
+        if hasattr(self, 'train_step'):
+            if self.train_step % 1000 == 0:
+                from logs import log_manager
+                log_manager.logger.debug(
+                    f"[Actor] 입력 데이터 확인:\n"
+                    f"  - 입력 shape: {x.shape}\n"
+                    f"  - Feature 개수: {x.shape[-1]}\n"
+                    f"  - 마지막 feature (보유 주식수): {x[0, :, -1]}\n"
+                    f"  - 보유 주식수 평균: {x[0, :, -1].mean().item():.4f}"
+                )
+        
         x = self.embedding(x)
         x = self.positional_encoding(x)
         x = self.transformer(x)
