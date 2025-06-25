@@ -194,6 +194,18 @@ def train_agent(env, agent, episodes, training_manager):
 
         final_portfolio_value = env.balance + (env.shares_held * env.close_prices[env.current_step] * env.close_price_scale)
         log_manager.logger.info(f"Episode {episode+1}/{episodes}, Total Reward: {total_reward}, final_portfolio_value: {final_portfolio_value:.2f}")
+        
+        # 🔥 상세한 포트폴리오 정보 출력
+        log_manager.logger.info(
+            f"[Episode {episode+1} 종료] 상세 포트폴리오 정보:\n"
+            f"  - 최종 잔고: {env.balance:,.0f}원\n"
+            f"  - 최종 보유 주식: {env.shares_held}주\n"
+            f"  - 최종 주가: {env.close_prices[env.current_step] * env.close_price_scale:,.0f}원\n"
+            f"  - 보유 주식 가치: {env.shares_held * env.close_prices[env.current_step] * env.close_price_scale:,.0f}원\n"
+            f"  - 최종 포트폴리오 가치: {final_portfolio_value:,.0f}원\n"
+            f"  - 초기 투자금: {env.initial_balance:,.0f}원\n"
+            f"  - 수익률: {((final_portfolio_value - env.initial_balance) / env.initial_balance * 100):.2f}%"
+        )
 
         # 매 100번째 에피소드마다 모델과 체크포인트 저장
         if (episode + 1) % 50 == 0:
