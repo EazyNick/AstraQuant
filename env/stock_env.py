@@ -124,28 +124,27 @@ class StockTradingEnv(gym.Env):
             shares_to_buy = action * 30  # 액션 값에 30을 곱함
             cost = shares_to_buy * price * (1 + self.transaction_fee)  # 거래 수수료 포함
             
-            # 🔥 디버깅: 매수 시도 상황 로그
-            if self.train_step % 1000 == 0:  # 1000 스텝마다만 출력
-                log_manager.logger.debug(
-                    f"[Step {self.current_step}] 매수 시도:\n"
-                    f"  - 액션: {action} (매수 {shares_to_buy}주)\n"
-                    f"  - 현재 가격: {price:,.0f}원\n"
-                    f"  - 필요 비용: {cost:,.0f}원\n"
-                    f"  - 현재 잔고: {self.balance:,.0f}원\n"
-                    f"  - 매수 가능: {'예' if cost <= self.balance else '아니오'}"
-                )
-            
             if cost <= self.balance:  # 잔고가 충분한 경우에만 매수
                 self.shares_held += shares_to_buy
                 self.balance -= cost
                 if self.train_step % 1000 == 0:
                     portfolio_value = self.balance + (self.shares_held * price)
-                    log_manager.logger.debug(f"  - 매수 성공! 보유 주식: {self.shares_held}주, 잔고: {self.balance:,.0f}원, 포트폴리오 밸류: {portfolio_value:,.0f}원")
+                    log_manager.logger.debug(
+                        f"[Step {self.current_step}] 매수 성공:\n"
+                        f"  - 액션: {action} (매수 {shares_to_buy}주)\n"
+                        f"  - 현재 가격: {price:,.0f}원\n"
+                        f"  - 필요 비용: {cost:,.0f}원\n"
+                        f"  - 매수 전 보유 주식: {self.shares_held - shares_to_buy}주\n"
+                        f"  - 매수 후 보유 주식: {self.shares_held}주\n"
+                        f"  - 매수 전 잔고: {self.balance + cost:,.0f}원\n"
+                        f"  - 매수 후 잔고: {self.balance:,.0f}원\n"
+                        f"  - 포트폴리오 밸류: {portfolio_value:,.0f}원\n"
+                        f"  - 스케일된 보유 주식: {self.normalize_shares_for_learning(self.shares_held):.4f}"
+                    )
                 self.last_buy_step = self.current_step  # 🔥 매수 시점 업데이트
             else:
                 reward -= 0.0001 * self.shares_held  # 매수 실패 패널티 감소
-                if self.train_step % 1000 == 0:
-                    log_manager.logger.debug(f"  - 매수 실패! 잔고 부족")
+                log_manager.logger.debug(f"  - 매수 실패! 잔고 부족")
 
         elif self.max_shares_per_trade < action <= 2 * self.max_shares_per_trade:
             # 매도 (Sell) - (action - max_shares_per_trade) * 30주 만큼 매도
@@ -165,12 +164,14 @@ class StockTradingEnv(gym.Env):
                         f"  - 매도 수익: {revenue:,.0f}원\n"
                         f"  - 보유 주식: {self.shares_held}주\n"
                         f"  - 잔고: {self.balance:,.0f}원\n"
-                        f"  - 포트폴리오 밸류: {portfolio_value:,.0f}원"
+                        f"  - 포트폴리오 밸류: {portfolio_value:,.0f}원\n"
+                        f"  - 매도 전 보유 주식: {self.shares_held + shares_to_sell}주\n"
+                        f"  - 매도 전 잔고: {self.balance - revenue:,.0f}원\n"
+                        f"  - 스케일된 보유 주식: {self.normalize_shares_for_learning(self.shares_held):.4f}"
                     )
             else:
                 reward -= 0.01  # 매도 실패 패널티 증가 (보유 주식이 없는데 매도하려 할 때)
-                if self.train_step % 1000 == 0:
-                    log_manager.logger.debug(f"[Step {self.current_step}] 매도 실패! 보유 주식 없음")
+                log_manager.logger.debug(f"[Step {self.current_step}] 매도 실패! 보유 주식 없음")
 
         self.current_step += 1
         done = self.current_step >= len(self.stock_data) - self.observation_window
