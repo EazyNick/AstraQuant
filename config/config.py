@@ -113,6 +113,12 @@ class ConfigManager:
     def get_clampepsilon(self):
         return self.config["training"]["clampepsilon"]
 
+    def get_entropy_coef(self):
+        return self.config["training"].get("entropy_coef", 0.1)
+
+    def get_temperature(self):
+        return self.config["training"].get("temperature", 1.2)
+
     def get_num_workers(self):
         return self.config["training"]["num_workers"]
 
@@ -167,6 +173,12 @@ class ConfigManager:
 
     def set_clampepsilon(self, value):
         self.config["training"]["clampepsilon"] = value
+
+    def set_entropy_coef(self, value):
+        self.config["training"]["entropy_coef"] = value
+
+    def set_temperature(self, value):
+        self.config["training"]["temperature"] = value
 
     def set_num_workers(self, value):
         self.config["training"]["num_workers"] = value

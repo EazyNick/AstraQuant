@@ -37,8 +37,8 @@ class ActorCriticAgent:
         self.gamma = config_manager.get_gamma()
         self.clampepsilon = config_manager.get_clampepsilon()
         self.batch_size = config_manager.get_batch_size()
-        self.entropy_coef = 0.02 # 엔트로피 보상 계수, 값을 키울수록 정책이 평평해짐. 0.02 등 값 권장
-        self.temperature = 0.9 # 정책 분평함 조정, 1.0보다 클 경우 더욱 평평해짐(탐험 증가)
+        self.entropy_coef = config_manager.get_entropy_coef()
+        self.temperature = config_manager.get_temperature()
 
         self.writer = writer
         self.train_step = 0
@@ -79,13 +79,17 @@ class ActorCriticAgent:
         probs = torch.softmax(logits / self.temperature, dim=-1)
         dist = Categorical(probs)
 
+        # 🔥 탐험 강화: epsilon-greedy + softmax sampling 혼합
         if random.random() < self.epsilon:
+            # 완전 랜덤 탐험
             action = random.choice(range(self.action_dim))
         else:
+            # 정책 기반 선택 (softmax sampling)
             action = dist.sample().item()
             
         log_prob = dist.log_prob(torch.tensor(action).to(self.device))
 
+        # 🔥 Epsilon 감소를 더 천천히
         self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
 
         # ✅ TensorBoard 기록
@@ -93,8 +97,8 @@ class ActorCriticAgent:
             for i in range(self.action_dim):
                 self.writer.add_scalar(f"Action_Prob/Action_{i}", probs[0, i].item(), self.train_step)
 
-        # ✅ 디버깅 로그
-        if self.train_step % 500 == 0:
+        # ✅ 디버깅 로그 (더 자주 출력)
+        if self.train_step % 100 == 0:  # 500 → 100으로 변경
             topk = sorted(enumerate(probs[0].tolist()), key=lambda x: x[1], reverse=True)[:3]
             topk_log = {}
             for idx, val in topk:
@@ -108,7 +112,7 @@ class ActorCriticAgent:
                     action_type = "전부매도"
                     action_info = f"{action_type}"
                 topk_log[f"Action_{idx}"] = f"{val:.4f} → {action_info}"
-            log_manager.logger.debug(f"{self.train_step} step Top-3 probs:\n{topk_log}")
+            log_manager.logger.debug(f"[Step {self.train_step}] Epsilon: {self.epsilon:.3f}, Top-3 probs:\n{topk_log}")
 
         self.train_step += 1
         value = self.critic(state_tensor).item()
