@@ -38,14 +38,13 @@ class ActorCriticAgent:
         self.clampepsilon = config_manager.get_clampepsilon()
         self.batch_size = config_manager.get_batch_size()
         self.entropy_coef = 0.02 # 엔트로피 보상 계수, 값을 키울수록 정책이 평평해짐. 0.02 등 값 권장
-        self.temperature = 0.9 # 정책 분포의 날카로움/평평함 조정, 1.0보다 클 경우 더욱 평평해짐(탐험 증가)
+        self.temperature = 0.9 # 정책 분평함 조정, 1.0보다 클 경우 더욱 평평해짐(탐험 증가)
 
         self.writer = writer
         self.train_step = 0
         self.epsilon = config_manager.get_epsilon()
         self.epsilon_min = config_manager.get_epsilon_min()
         self.epsilon_decay = config_manager.get_epsilon_decay()
-        self.max_shares_per_trade = config_manager.get_max_shares_per_trade()
         self.action_dim = actor.action_dim
 
     def select_action(self, state):
@@ -102,12 +101,12 @@ class ActorCriticAgent:
                 if idx == 0:
                     action_type = "관망"
                     action_info = f"{action_type}"
-                elif 1 <= idx <= self.max_shares_per_trade:
-                    action_type = "매수"
-                    action_info = f"{action_type}({idx * 30}주)"
-                else:
-                    action_type = "매도"
-                    action_info = f"{action_type}({(idx - self.max_shares_per_trade) * 30}주)"
+                elif idx == 1:
+                    action_type = "전부매수"
+                    action_info = f"{action_type}"
+                else:  # idx == 2
+                    action_type = "전부매도"
+                    action_info = f"{action_type}"
                 topk_log[f"Action_{idx}"] = f"{val:.4f} → {action_info}"
             log_manager.logger.debug(f"{self.train_step} step Top-3 probs:\n{topk_log}")
 

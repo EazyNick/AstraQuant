@@ -12,8 +12,8 @@ class ActorNetwork(nn.Module):
         num_heads = config_manager.get_num_heads()
         num_layers = config_manager.get_num_layers()
 
-        self.max_shares_per_trade = config_manager.get_max_shares_per_trade()
-        self.action_dim = 1 + 2 * self.max_shares_per_trade
+        # 🔥 액션 차원을 3개로 고정: 0=관망, 1=전부매수, 2=전부매도
+        self.action_dim = 3
         self.input_dim = input_dim  # main_train.py에서 이미 input_dim + 1을 전달함
 
         self.embedding = nn.Linear(self.input_dim, model_dim).to(self.device)

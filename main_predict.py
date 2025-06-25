@@ -136,12 +136,10 @@ if __name__ == "__main__":
 
     # ✅ 전체 데이터에 대한 예측 수행
     action_dict = {}
-    max_volume = config_manager.get_max_shares_per_trade()
-    # action_dict 생성
+    # 🔥 3개 액션으로 단순화: 0=관망, 1=전부매수, 2=전부매도
     action_dict[0] = "관망(Hold)"
-    for i in range(1, max_volume + 1):
-        action_dict[i] = f"매수(Buy) {i * 30}주"  # 30배로 수정
-        action_dict[i + max_volume] = f"매도(Sell) {i * 30}주"  # 30배로 수정
+    action_dict[1] = "전부매수(Buy All)"
+    action_dict[2] = "전부매도(Sell All)"
 
     predictions = []
     probs_list = []  # ✅ 확률 리스트 저장용
@@ -164,20 +162,20 @@ if __name__ == "__main__":
 
 
         # ✅ 보유 수량 업데이트 (30배로 수정)
-        if 1 <= action <= max_volume: # 매수
-            shares_to_buy = action * 30  # 30배로 수정
-            cost = shares_to_buy * current_price * (1 + transaction_fee)
+        if 1 <= action <= 2: # 매수 또는 매도
+            shares_to_trade = 30  # 30주 매매
+            cost = shares_to_trade * current_price * (1 + transaction_fee)
             if cost <= balance:
-                holding += shares_to_buy
-                balance -= cost
-                print(f"매수: {holding}주")
-        elif max_volume < action <= 2 * max_volume: # 매도
-            shares_to_sell = (action - max_volume) * 30  # 30배로 수정
-            shares_to_sell = min(shares_to_sell, holding)
-            revenue = shares_to_sell * current_price * (1 - transaction_fee)
-            balance += revenue
-            holding -= shares_to_sell
-            print(f"매도: {holding}주")
+                if action == 1: # 매수
+                    holding += shares_to_trade
+                    balance -= cost
+                    print(f"매수: {holding}주")
+                else: # 매도
+                    holding -= shares_to_trade
+                    balance += cost
+                    print(f"매도: {holding}주")
+        else:
+            print(f"관망(Hold) 상태입니다.")
 
     # ✅ 데이터프레임으로 변환 및 출력
     pd.set_option("display.max_rows", None)
@@ -199,8 +197,8 @@ if __name__ == "__main__":
     log_manager.logger.info(summary)
 
     # ✅ 확률 분포에서 매수/매도/관망 각각의 총합 계산
-    buy_prob_sum = np.sum(probs[0][1:max_volume + 1])
-    sell_prob_sum = np.sum(probs[0][max_volume + 1:2 * max_volume + 1])
+    buy_prob_sum = np.sum(probs[0][1:2])
+    sell_prob_sum = np.sum(probs[0][2:3])
     hold_prob = probs[0][0]
 
     total_sum = buy_prob_sum + sell_prob_sum + hold_prob
