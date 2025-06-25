@@ -236,8 +236,8 @@ if __name__ == "__main__":
 
     # ✅ 환경 및 모델 생성
     env = StockTradingEnv(data, writer=writer)
-    actor = ActorNetwork(input_dim=input_dim)
-    critic = CriticNetwork(input_dim=input_dim)
+    actor = ActorNetwork(input_dim=input_dim)  # 환경에서 Close 제거 후 + shares held = input_dim
+    critic = CriticNetwork(input_dim=input_dim)  # 환경에서 Close 제거 후 + shares held = input_dim
     agent = ActorCriticAgent(actor, critic, writer=writer)
 
     # ✅ 학습 시작

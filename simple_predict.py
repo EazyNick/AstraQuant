@@ -1,7 +1,6 @@
 import torch
 import numpy as np
 import os
-import argparse
 import pandas as pd
 from models.actor_network import ActorNetwork
 from data.data_loader import load_stock_data
@@ -19,7 +18,7 @@ def load_model(model_path, model_class, input_dim, device="cpu"):
 
     Args:
         model_path (str): 모델 가중치 파일 경로
-        model_class (torch.nn.Module): 모델 클래스 (StockTransformer 등)
+        model_class (torch.nn.Module): 모델 클래스 (ActorNetwork 등)
         input_dim (int): 모델 입력 차원
         device (str, optional): 사용할 디바이스. 기본값: "cpu"
 
@@ -98,13 +97,10 @@ def get_prediction_by_date(result_df, target_date: str):
     return action_str, prob
 
 if __name__ == "__main__":
-    import pandas as pd
-    # ✅ 설정 가져오기
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--model_path', type=str, default=os.path.join(os.path.dirname(__file__), 'output', 'ppo_stock_trader_episode_296.pth'), help='사용할 모델 가중치 파일 (.pth) 경로 (기본값: ppo_stock_trader_episode_288.pth)')
-    parser.add_argument('--test_data', type=str, default='data/csv/sp500_test_data.csv', help='테스트 데이터 (.csv) 파일 경로 (기본값: data/csv/sp500_test_data.csv)')
-    args = parser.parse_args()
-
+    # ✅ 설정값 직접 지정 (argument 없이)
+    MODEL_PATH = "output/ppo_stock_trader_episode_1.pth"  # 모델 파일 경로
+    TEST_DATA = "data/cursor_csv/AMZN_train_data.csv"    # 테스트 데이터 파일 경로
+    
     device = torch.device(config_manager.get_device())
     balance = config_manager.get_initial_balance()
     transaction_fee = config_manager.get_transaction_fee()
@@ -112,19 +108,19 @@ if __name__ == "__main__":
     holding = 0
 
     # ✅ 저장된 모델 로드 
-    stock_data, input_dim = load_stock_data(args.test_data)
+    stock_data, input_dim = load_stock_data(TEST_DATA)
     print(f"📊 로드된 데이터 형태: {stock_data.shape}")
     print(f"📐 데이터 입력 차원: {input_dim}")
     
     # ✅ 환경에서 Close 제거하고 shares held 추가하므로 input_dim 그대로 사용
-    actor_model = load_model(args.model_path, ActorNetwork, input_dim, device)
+    actor_model = load_model(MODEL_PATH, ActorNetwork, input_dim, device)
     
     if actor_model is None:
         log_manager.logger.error("❌ 모델 로드에 실패했습니다. 프로그램을 종료합니다.")
         exit(1)
 
-    # df = pd.read_csv(args.test_data or 'data/csv/AMZN_test_data.csv')
-    df = pd.read_csv(args.test_data or 'data/cursor_csv/AMZN_test_data.csv')
+    # ✅ 데이터 로드
+    df = pd.read_csv(TEST_DATA)
     df['Date'] = pd.to_datetime(df['Date'])  # 날짜 형식 변환
     df = df.sort_values('Date').reset_index(drop=True)
     dates = df['Date'].values  # 다시 정렬된 날짜로 업데이트
@@ -218,7 +214,6 @@ if __name__ == "__main__":
     log_manager.logger.info(f"🟥 매도(Sell) 확률 총합: {sell_prob_sum:.2f} ({sell_percent:.2f}%)")
     log_manager.logger.info(f"🟨 관망(Hold) 확률: {hold_prob:.2f} ({hold_percent:.2f}%)")
 
-
     # ✅ 실제 데이터의 마지막 날짜 (df 기준)
     true_last_date = df.iloc[-1]['Date']
 
@@ -247,8 +242,7 @@ if __name__ == "__main__":
     if action_str is not None:
         log_manager.logger.info(f"📅 [{target_date}] 예측 결과: {action_str} (확률: {prob:.2f}%)")
 
-        # ✅ 전체 액션 확률을 저장용 리스트로 정리
-        # ✅ 전체 액션 확률을 저장용 리스트로 정리
+    # ✅ 전체 액션 확률을 저장용 리스트로 정리
     all_prob_records = []
     for i in range(len(predictions)):
         date = predictions[i][0]
@@ -273,8 +267,6 @@ if __name__ == "__main__":
     detailed_result_df.to_csv(output_csv_path, index=False, encoding='utf-8-sig')
     log_manager.logger.info(f"📁 예측 결과가 CSV로 저장되었습니다: {output_csv_path}")
 
-
-
-    # 예시 명령어
-    # python main_predict.py --model_path output/ppo_stock_trader_episode_350.pth --test_data data/csv/005930.KS_combined_train_data.csv
-    # python main_predict.py --model_path output/ppo_stock_trader_episode_1148.pth --test_data data/csv/005930.KS_combined_test_data.csv
+    print("\n🎉 예측 완료!")
+    print(f"📁 결과 파일: {output_csv_path}")
+    print(f"📊 총 예측 건수: {len(predictions)}건") 

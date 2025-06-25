@@ -81,10 +81,6 @@ class ConfigManager:
     
     def get_transaction_fee(self):
         return self.config["env"].get("transaction_fee", 0.001)  # 기본값 설정
-
-    def get_max_shares_per_trade(self):
-        """분할 매수, 매도 상한 반환"""
-        return self.config['env']['max_shares_per_trade']
     
     def get_shares_scaling_factor(self):
         """주식 보유량 학습용 스케일링 팩터 반환"""
@@ -116,6 +112,12 @@ class ConfigManager:
 
     def get_clampepsilon(self):
         return self.config["training"]["clampepsilon"]
+
+    def get_entropy_coef(self):
+        return self.config["training"].get("entropy_coef", 0.1)
+
+    def get_temperature(self):
+        return self.config["training"].get("temperature", 1.2)
 
     def get_num_workers(self):
         return self.config["training"]["num_workers"]
@@ -171,6 +173,12 @@ class ConfigManager:
 
     def set_clampepsilon(self, value):
         self.config["training"]["clampepsilon"] = value
+
+    def set_entropy_coef(self, value):
+        self.config["training"]["entropy_coef"] = value
+
+    def set_temperature(self, value):
+        self.config["training"]["temperature"] = value
 
     def set_num_workers(self, value):
         self.config["training"]["num_workers"] = value

@@ -37,10 +37,10 @@ class StockTradingEnv(gym.Env):
         self.observation_window = config_manager.get_observation_window()
         self.transaction_fee = config_manager.get_transaction_fee() 
         
-        # 🔥 Close 가격을 별도로 보관 (포트폴리오 계산용)
+        # Close 가격을 별도로 보관 (포트폴리오 계산용)
         self.close_prices = stock_data[:, 0]  # Close 가격만 별도 보관
         
-        # 🔥 Close를 제외한 학습용 데이터 생성
+        # Close를 제외한 학습용 데이터 생성
         self.stock_data = np.delete(stock_data, 0, axis=1)  # 첫 번째 컬럼(Close) 제거
         
         self.feature_dim = self.stock_data.shape[1] # Close 제외한 feature 개수
@@ -50,11 +50,11 @@ class StockTradingEnv(gym.Env):
         self.close_price_scale = 10  # 'Close' 값을 원래 가격으로 복원할 때 사용할 스케일
         self.previous_portfolio_value = self.initial_balance
         
-        # 🔥 주식 보유량 스케일링 개선
-        self.max_shares_per_trade = config_manager.get_max_shares_per_trade()
+        # 주식 보유량 스케일링 개선
         self.shares_scaling_factor = config_manager.get_shares_scaling_factor()  # 설정에서 가져오기
         
-        self.action_space = spaces.Discrete(1 + 2 * self.max_shares_per_trade)
+        # 액션 공간을 3개로 단순화: 0=관망, 1=전부매수, 2=전부매도
+        self.action_space = spaces.Discrete(3)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.observation_window, self.feature_dim), dtype=np.float32)
 
         # ✅ TensorBoard 추가
@@ -84,17 +84,19 @@ class StockTradingEnv(gym.Env):
         self.balance = self.initial_balance
         self.shares_held = 0  # 정수값으로 초기화
         self.previous_portfolio_value = self.initial_balance 
-        self.last_buy_step = None  # 🔥 매수 시점 추적 초기화
+        self.last_buy_step = None  # 매수 시점 추적 초기화
+        self.last_sell_step = None  # 매도 시점 추적 초기화
+        self.last_sold_shares = 0  # 매도한 주식 수 초기화
 
         # 🔹 기존 상태 (주가 데이터) + 보유 주식 수 추가
         state = self.stock_data[self.current_step:self.current_step + self.observation_window]
         
-        # 🔥 주식 보유량을 학습용 스케일로 변환
+        # 주식 보유량을 학습용 스케일로 변환
         scaled_shares = self.normalize_shares_for_learning(self.shares_held)
         shares_held_feature = np.full((self.observation_window, 1), scaled_shares)  # 스케일된 보유 주식수를 feature로 추가
         state_with_shares = np.hstack((state, shares_held_feature))  # 상태 확장
         
-        # 🔥 디버깅: 보유 주식수 feature 확인
+        # 디버깅: 보유 주식수 feature 확인
         log_manager.logger.debug(
             f"[Reset] 보유 주식수 feature 확인:\n"
             f"  - 원본 state shape: {state.shape}\n"
@@ -116,75 +118,82 @@ class StockTradingEnv(gym.Env):
             return None, 0, True  # 가격이 NaN이면 종료
 
         if action == 0:
-            # 관망
+            # 관망 (Hold)
             pass
 
-        elif 1 <= action <= self.max_shares_per_trade: 
-            # 매수 (Buy) - action * 30주 만큼 매수
-            shares_to_buy = action * 30  # 액션 값에 30을 곱함
-            cost = shares_to_buy * price * (1 + self.transaction_fee)  # 거래 수수료 포함
-            
-            if cost <= self.balance:  # 잔고가 충분한 경우에만 매수
-                self.shares_held += shares_to_buy
-                self.balance -= cost
-                if self.train_step % 1000 == 0:
-                    portfolio_value = self.balance + (self.shares_held * price)
-                    log_manager.logger.debug(
-                        f"[Step {self.current_step}] 매수 성공:\n"
-                        f"  - 액션: {action} (매수 {shares_to_buy}주)\n"
-                        f"  - 현재 가격: {price:,.0f}원\n"
-                        f"  - 필요 비용: {cost:,.0f}원\n"
-                        f"  - 매수 전 보유 주식: {self.shares_held - shares_to_buy}주\n"
-                        f"  - 매수 후 보유 주식: {self.shares_held}주\n"
-                        f"  - 매수 전 잔고: {self.balance + cost:,.0f}원\n"
-                        f"  - 매수 후 잔고: {self.balance:,.0f}원\n"
-                        f"  - 포트폴리오 밸류: {portfolio_value:,.0f}원\n"
-                        f"  - 스케일된 보유 주식: {self.normalize_shares_for_learning(self.shares_held):.4f}"
-                    )
-                self.last_buy_step = self.current_step  # 🔥 매수 시점 업데이트
+        elif action == 1:
+            # 전부 매수 (Buy All)
+            if self.balance > 0:  # 잔고가 있는 경우에만 매수
+                # 현재 잔고로 살 수 있는 최대 주식 수 계산
+                max_shares_possible = int(self.balance / (price * (1 + self.transaction_fee)))
+                if max_shares_possible > 0:
+                    cost = max_shares_possible * price * (1 + self.transaction_fee)
+                    self.shares_held += max_shares_possible
+                    self.balance -= cost
+                    if self.train_step % 1000 == 0:
+                        portfolio_value = self.balance + (self.shares_held * price)
+                        log_manager.logger.debug(
+                            f"[Step {self.current_step}] 전부 매수 성공:\n"
+                            f"  - 액션: {action} (전부 매수)\n"
+                            f"  - 현재 가격: {price:,.0f}원\n"
+                            f"  - 매수 주식: {max_shares_possible}주\n"
+                            f"  - 필요 비용: {cost:,.0f}원\n"
+                            f"  - 매수 전 보유 주식: {self.shares_held - max_shares_possible}주\n"
+                            f"  - 매수 후 보유 주식: {self.shares_held}주\n"
+                            f"  - 매수 전 잔고: {self.balance + cost:,.0f}원\n"
+                            f"  - 매수 후 잔고: {self.balance:,.0f}원\n"
+                            f"  - 포트폴리오 밸류: {portfolio_value:,.0f}원\n"
+                            f"  - 스케일된 보유 주식: {self.normalize_shares_for_learning(self.shares_held):.4f}"
+                        )
+                    self.last_buy_step = self.current_step
+                    self.last_sell_step = None  # 매수 시 매도 시점 초기화
+                    self.last_sold_shares = 0  # 매수 시 매도 주식 수 초기화
+                else:
+                    reward -= 0.001  # 매수 실패 패널티 (잔고 부족)
+                    if self.train_step % 1000 == 0:
+                        log_manager.logger.debug(f"[Step {self.current_step}] 전부 매수 실패! 잔고 부족")
             else:
-                reward -= 0.0001 * self.shares_held  # 매수 실패 패널티 감소
-                log_manager.logger.debug(f"  - 매수 실패! 잔고 부족")
+                reward -= 0.0001  # 매수 실패 패널티 (잔고 없음)
+                if self.train_step % 1000 == 0:
+                    log_manager.logger.debug(f"[Step {self.current_step}] 전부 매수 실패! 잔고 없음")
 
-        elif self.max_shares_per_trade < action <= 2 * self.max_shares_per_trade:
-            # 매도 (Sell) - (action - max_shares_per_trade) * 30주 만큼 매도
-            if self.shares_held > 0: 
-                shares_to_sell = (action - self.max_shares_per_trade) * 30  # 액션 값에 30을 곱함
-                shares_to_sell = min(shares_to_sell, self.shares_held)
-                revenue = shares_to_sell * price * (1 - self.transaction_fee)  # 거래 수수료 포함
+        elif action == 2:
+            # 전부 매도 (Sell All)
+            if self.shares_held > 0:  # 보유 주식이 있는 경우에만 매도
+                revenue = self.shares_held * price * (1 - self.transaction_fee)
                 self.balance += revenue
-                self.shares_held -= shares_to_sell # 매도한만큼 주식수량 조정
+                shares_sold = self.shares_held
+                self.shares_held = 0  # 전부 매도
+                self.last_buy_step = None  # 매도 시 매수 시점 초기화
+                self.last_sell_step = self.current_step  # 매도 시점 기록
+                self.last_sold_shares = shares_sold  # 매도한 주식 수 기록
                 
-                # 🔥 디버깅: 매도 성공 로그
                 if self.train_step % 1000 == 0:
                     portfolio_value = self.balance + (self.shares_held * price)
                     log_manager.logger.debug(
-                        f"[Step {self.current_step}] 매도 성공:\n"
-                        f"  - 액션: {action} (매도 {shares_to_sell}주)\n"
+                        f"[Step {self.current_step}] 전부 매도 성공:\n"
+                        f"  - 액션: {action} (전부 매도)\n"
+                        f"  - 매도 주식: {shares_sold}주\n"
                         f"  - 매도 수익: {revenue:,.0f}원\n"
                         f"  - 보유 주식: {self.shares_held}주\n"
                         f"  - 잔고: {self.balance:,.0f}원\n"
                         f"  - 포트폴리오 밸류: {portfolio_value:,.0f}원\n"
-                        f"  - 매도 전 보유 주식: {self.shares_held + shares_to_sell}주\n"
-                        f"  - 매도 전 잔고: {self.balance - revenue:,.0f}원\n"
                         f"  - 스케일된 보유 주식: {self.normalize_shares_for_learning(self.shares_held):.4f}"
                     )
             else:
-                reward -= 0.01  # 매도 실패 패널티 증가 (보유 주식이 없는데 매도하려 할 때)
-                log_manager.logger.debug(f"[Step {self.current_step}] 매도 실패! 보유 주식 없음")
+                reward -= 0.001  # 매도 실패 패널티 (보유 주식 없음)
+                if self.train_step % 1000 == 0:
+                    log_manager.logger.debug(f"[Step {self.current_step}] 전부 매도 실패! 보유 주식 없음")
 
-        self.current_step += 1
-        done = self.current_step >= len(self.stock_data) - self.observation_window
-        next_state = self.stock_data[self.current_step:self.current_step + self.observation_window]
-
-        # 새로운 포트폴리오 가치 계산
+        # 새로운 포트폴리오 가치 계산 (현재 스텝의 가격 사용)
         new_portfolio_value = self.balance + (self.shares_held * price)
 
         # 1. 단기 수익률 보상
         short_term_reward = 0
         long_term_reward = 0
         holding_reward = 0
-        risk_penalty = 0
+        future_price_reward = 0
+        sell_price_reward = 0
         transaction_penalty = 0
         holding_encouragement = 0
 
@@ -196,30 +205,28 @@ class StockTradingEnv(gym.Env):
         long_term_reward = ((new_portfolio_value - self.initial_balance) / self.initial_balance) * 10
 
         # 3. 보유 주식 가격 변화 보상
-        if self.shares_held > 0 and self.current_step > 1:  # 🔥 첫 번째 스텝이 아닌 경우에만 계산
-            # 🔥 current_step이 이미 증가된 상태이므로 -2를 해야 현재 스텝과 이전 스텝을 비교
-            prev_price = self.close_prices[self.current_step - 2] * self.close_price_scale  # 별도 보관된 Close 가격 사용
+        if self.shares_held > 0 and self.current_step > 1:  # 첫 번째 스텝이 아닌 경우에만 계산
+            # -1을 해야 이전 스텝과 현재 스텝을 비교
+            prev_price = self.close_prices[self.current_step - 1] * self.close_price_scale  # 별도 보관된 Close 가격 사용
             price_change = (price - prev_price) / prev_price
             holding_reward = price_change * self.shares_held * 0.1
 
         # 4. 매수 후 미래 가격 변화 보상 (새로 추가)
-        future_price_reward = 0
-        if hasattr(self, 'last_buy_step') and self.last_buy_step is not None:
-            # 🔥 매수한 스텝 이후 몇 스텝이 지났는지 확인
+        if self.shares_held > 0 and self.last_buy_step is not None:
             steps_since_buy = self.current_step - self.last_buy_step
             
-            # 🔥 매수 후 1-5 스텝 동안의 가격 변화를 고려
+            # 매수 후 1-5 스텝 동안의 가격 변화를 고려
             if 1 <= steps_since_buy <= 5:
                 buy_price = self.close_prices[self.last_buy_step] * self.close_price_scale
                 current_price = price  # 현재 스텝의 가격
                 future_price_change = (current_price - buy_price) / buy_price
                 
-                # 🔥 매수 후 가격 상승 시 양의 보상, 하락 시 음의 보상
+                # 매수 후 가격 상승 시 양의 보상, 하락 시 음의 보상
                 # 시간이 지날수록 보상 가중치 감소 (즉시 반응을 더 중요하게)
                 time_weight = 1.0 / steps_since_buy  # 1스텝 후: 1.0, 2스텝 후: 0.5, 3스텝 후: 0.33...
                 future_price_reward = future_price_change * self.shares_held * 0.2 * time_weight
                 
-                # 🔥 디버깅: 매수 후 미래 가격 변화 보상 (1000 스텝마다)
+                # 디버깅: 매수 후 미래 가격 변화 보상 (1000 스텝마다)
                 if self.train_step % 1000 == 0:
                     log_manager.logger.debug(
                         f"[Step {self.current_step}] 매수 후 미래 가격 변화 보상:\n"
@@ -232,16 +239,44 @@ class StockTradingEnv(gym.Env):
                         f"  - 보상: {future_price_reward:.6f}"
                     )
 
-        # 5. 거래 수수료 패널티
+        # 5. 매도 후 미래 가격 변화 보상 (새로 추가)
+        if self.shares_held == 0 and self.last_sell_step is not None:
+            steps_since_sell = self.current_step - self.last_sell_step
+            
+            # 매도 후 1-5 스텝 동안의 가격 변화를 고려
+            if 1 <= steps_since_sell <= 5:
+                sell_price = self.close_prices[self.last_sell_step] * self.close_price_scale
+                current_price = price  # 현재 스텝의 가격
+                price_change_since_sell = (current_price - sell_price) / sell_price
+                
+                # 매도 후 가격 상승 시 음의 보상(패널티), 하락 시 양의 보상
+                # 매도를 너무 일찍 했으면 패널티, 적절한 타이밍이면 보상
+                time_weight = 1.0 / steps_since_sell  # 1스텝 후: 1.0, 2스텝 후: 0.5, 3스텝 후: 0.33...
+                sell_price_reward = -price_change_since_sell * self.last_sold_shares * 0.2 * time_weight
+                
+                # 디버깅: 매도 후 미래 가격 변화 보상 (1000 스텝마다)
+                if self.train_step % 1000 == 0:
+                    log_manager.logger.debug(
+                        f"[Step {self.current_step}] 매도 후 미래 가격 변화 보상:\n"
+                        f"  - 매도 스텝: {self.last_sell_step}\n"
+                        f"  - 매도 후 경과 스텝: {steps_since_sell}\n"
+                        f"  - 매도 가격: {sell_price:,.0f}원\n"
+                        f"  - 현재 가격: {current_price:,.0f}원\n"
+                        f"  - 가격 변화율: {price_change_since_sell:.4f}\n"
+                        f"  - 시간 가중치: {time_weight:.2f}\n"
+                        f"  - 보상: {sell_price_reward:.6f}"
+                    )
+
+        # 6. 거래 수수료 패널티
         if action > 0:  # 매수나 매도 행동을 했을 때
             transaction_penalty = -self.transaction_fee * 0.01
 
-        # 6. 보유 주식 장려 보상 (새로 추가)
+        # 7. 보유 주식 장려 보상 (새로 추가)
         if self.shares_held > 0:
             holding_encouragement = 0.001 * self.shares_held  # 보유 주식 수에 비례한 보상
 
         # 최종 보상 계산
-        reward = short_term_reward + long_term_reward + holding_reward + future_price_reward + transaction_penalty + holding_encouragement
+        reward = short_term_reward + long_term_reward + holding_reward + future_price_reward + sell_price_reward + transaction_penalty + holding_encouragement
         self.total_reward += reward
 
         # TensorBoard 기록
@@ -253,6 +288,7 @@ class StockTradingEnv(gym.Env):
             self.writer.add_scalar("Reward/Long-Term", long_term_reward, self.train_step)
             self.writer.add_scalar("Reward/Holding", holding_reward, self.train_step)
             self.writer.add_scalar("Reward/Future-Price", future_price_reward, self.train_step)
+            self.writer.add_scalar("Reward/Sell-Price", sell_price_reward, self.train_step)
             self.writer.add_scalar("Reward/Transaction", transaction_penalty, self.train_step)
             self.writer.add_scalar("Reward/Total", reward, self.train_step)
 
@@ -268,17 +304,24 @@ class StockTradingEnv(gym.Env):
 
         # 가장 오래된 값을 제거하고, 새로운 보유 주식 수 추가
         self.shares_held_history = np.roll(self.shares_held_history, shift=-1)
-        scaled_shares = self.normalize_shares_for_learning(self.shares_held)  # 🔥 스케일된 값으로 업데이트
+        scaled_shares = self.normalize_shares_for_learning(self.shares_held)  # 스케일된 값으로 업데이트
         self.shares_held_history[-1] = scaled_shares
 
         # 과거 보유 주식 수 기록을 상태와 함께 결합
         shares_held_feature = self.shares_held_history.reshape(-1, 1)  # (observation_window, 1)
+        
+        # current_step 증가를 먼저 실행
+        self.current_step += 1
+        done = self.current_step >= len(self.stock_data) - self.observation_window
+        
+        # 다음 스텝의 상태 계산 (current_step 증가 후)
+        next_state = self.stock_data[self.current_step:self.current_step + self.observation_window]
         next_state_with_shares = np.hstack((next_state, shares_held_feature))
 
-        # 🔥 디버깅: 주식 보유량 스케일링 확인 (1000 스텝마다)
+        # 디버깅: 주식 보유량 스케일링 확인 (1000 스텝마다)
         if self.train_step % 1000 == 0:
             log_manager.logger.debug(
-                f"[Step {self.current_step}] 주식 보유량 스케일링 확인:\n"
+                f"[Step {self.current_step - 1}] 주식 보유량 스케일링 확인:\n"
                 f"  - 실제 보유 주식 수: {self.shares_held} (정수)\n"
                 f"  - 스케일된 보유 주식 수: {scaled_shares:.4f} (학습용)\n"
                 f"  - shares_held_history: {self.shares_held_history}\n"
@@ -287,24 +330,6 @@ class StockTradingEnv(gym.Env):
                 f"  - next_state_with_shares shape: {next_state_with_shares.shape}\n"
                 f"  - 마지막 feature 값들: {next_state_with_shares[:, -1]}"
             )
-
-        # log_manager.logger.debug(f"Step: {self.current_step}, Action: {['Sell', 'Hold', 'Buy'][action]}, Reward: {reward}, Portfolio: {new_portfolio_value}, Shares Held: {self.shares_held}")
-
-        # 입력 state 로그 출력해보기
-        # self.feature_names = [
-        #                     "D_Close",
-        #                     "D_Slope_SMA_5", "D_Slope_SMA_10", "D_Slope_SMA_15", "D_Slope_SMA_20",
-        #                     "W_Slope_SMA_5", "W_Slope_SMA_10",
-        #                     "M_Slope_SMA_5",
-        #                     "보유 주식 수"
-        #                 ]
-
-        # # ✅ 마지막 시점 상태 출력 (사람이 읽기 쉽게 각 항목 설명)
-        # last_state_row = next_state_with_shares[-1]  # 마지막 timestep의 입력
-        # log_msg = f"[Step {self.current_step}] 📥 입력 상태 (가장 최근 시점):\n"
-        # for name, value in zip(self.feature_names, last_state_row):
-        #     log_msg += f" - {name}: {value:.4f}\n"
-        # log_manager.logger.debug(log_msg.strip())
 
         return next_state_with_shares, reward, done
 
