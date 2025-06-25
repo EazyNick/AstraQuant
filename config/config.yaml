@@ -20,8 +20,8 @@ training:
   learning_rate: 0.0001 # 학습률
   gamma: 0.999 # 할인율 (future reward 반영 비율)
   clampepsilon: 0.2 # PPO 클리핑 파라미터
-  entropy_coef: 0.1 # 엔트로피 보상 계수 (정책 다양성 장려, 높을수록 더 평평한 분포)
-  temperature: 1.2 # 정책 분포 온도 (높을수록 더 평평한 분포, 낮을수록 날카로운 분포)
+  entropy_coef: 0.12 # 엔트로피 보상 계수 (정책 다양성 장려, 높을수록 더 평평한 분포)
+  temperature: 1.4 # 정책 분포 온도 (높을수록 더 평평한 분포, 낮을수록 날카로운 분포), (뜻: 온도, 분자들이 활발하게 움직이는 정도)
   num_workers: NULL # 병렬 환경 개수 (멀티 프로세싱 사용 시)
 
 model:

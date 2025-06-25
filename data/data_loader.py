@@ -64,7 +64,8 @@ if __name__ == "__main__":
     import os
 
     # ✅ 샘플 CSV 파일 경로 설정
-    sample_file = "data/cursor_csv/AMZN_train_data.csv"
+    # sample_file = "data/cursor_csv/AMZN_train_data.csv"
+    sample_file = "data/cursor_csv/AMZN_test_data.csv"
 
      # ✅ 파일이 존재하는지 확인 후 로드
     if os.path.exists(sample_file):
