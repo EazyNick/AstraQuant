@@ -110,6 +110,10 @@ if __name__ == "__main__":
     transaction_fee = config_manager.get_transaction_fee()
     # ✅ 초기 보유 수량
     holding = 0
+    
+    # ✅ 초기 포트폴리오 밸류 기록
+    initial_balance = balance
+    initial_holding = holding
 
     # ✅ 저장된 모델 로드 
     stock_data, input_dim = load_stock_data(args.test_data)
@@ -135,6 +139,16 @@ if __name__ == "__main__":
     observation_window = config_manager.get_observation_window()
     if stock_data.shape[0] < observation_window:
         raise ValueError(f"❌ 테스트 데이터가 너무 적습니다! (필요: {observation_window}, 제공됨: {stock_data.shape[0]})")
+
+    # ✅ 초기 주가 기록 (첫 번째 예측 시점의 주가)
+    initial_price = stock_data[observation_window, 0] * 10
+    initial_portfolio_value = initial_balance + (initial_holding * initial_price)
+    
+    log_manager.logger.info(f"💰 초기 포트폴리오 정보:")
+    log_manager.logger.info(f"   - 초기 잔고: {initial_balance:,.0f}원")
+    log_manager.logger.info(f"   - 초기 보유 주식: {initial_holding}주")
+    log_manager.logger.info(f"   - 초기 주가: {initial_price:,.0f}원")
+    log_manager.logger.info(f"   - 초기 포트폴리오 밸류: {initial_portfolio_value:,.0f}원")
 
     # ✅ 전체 데이터에 대한 예측 수행
     action_dict = {}
@@ -167,21 +181,55 @@ if __name__ == "__main__":
             log_manager.logger.error(f"   - 모델 입력 차원: {input_dim}")
             continue
 
-        # ✅ 보유 수량 업데이트 (30배로 수정)
-        if 1 <= action <= 2: # 매수 또는 매도
-            shares_to_trade = 30  # 30주 매매
-            cost = shares_to_trade * current_price * (1 + transaction_fee)
-            if cost <= balance:
-                if action == 1: # 매수
-                    holding += shares_to_trade
+        # ✅ 보유 수량 업데이트 - 환경과 동일한 전량 매수/매도 로직
+        if action == 1:  # 전량 매수 (Buy All)
+            if balance > 0:  # 잔고가 있는 경우에만 매수
+                # 현재 잔고로 살 수 있는 최대 주식 수 계산
+                max_shares_possible = int(balance / (current_price * (1 + transaction_fee)))
+                if max_shares_possible > 0:
+                    cost = max_shares_possible * current_price * (1 + transaction_fee)
+                    holding += max_shares_possible
                     balance -= cost
-                    print(f"매수: {holding}주")
-                else: # 매도
-                    holding -= shares_to_trade
-                    balance += cost
-                    print(f"매도: {holding}주")
-        else:
-            print(f"관망(Hold) 상태입니다.")
+                    print(f"전량 매수: {max_shares_possible}주 → 총 보유: {holding}주, 잔고: {balance:,.0f}원")
+        elif action == 2:  # 전량 매도 (Sell All)
+            if holding > 0:  # 보유 주식이 있는 경우에만 매도
+                revenue = holding * current_price * (1 - transaction_fee)
+                shares_sold = holding
+                holding = 0  # 전량 매도
+                balance += revenue
+                print(f"전량 매도: {shares_sold}주 → 총 보유: {holding}주, 잔고: {balance:,.0f}원")
+        # 관망이나 실패한 거래는 로그 출력하지 않음
+
+    # ✅ 최종 포트폴리오 밸류 계산
+    final_price = stock_data[-1, 0] * 10  # 마지막 주가
+    final_portfolio_value = balance + (holding * final_price)
+    
+    # ✅ 수익률 계산
+    total_return = final_portfolio_value - initial_portfolio_value
+    return_rate = (total_return / initial_portfolio_value) * 100
+    
+    log_manager.logger.info(f"💰 최종 포트폴리오 정보:")
+    log_manager.logger.info(f"   - 최종 잔고: {balance:,.0f}원")
+    log_manager.logger.info(f"   - 최종 보유 주식: {holding}주")
+    log_manager.logger.info(f"   - 최종 주가: {final_price:,.0f}원")
+    log_manager.logger.info(f"   - 최종 포트폴리오 밸류: {final_portfolio_value:,.0f}원")
+    
+    log_manager.logger.info(f"📈 투자 성과 분석:")
+    log_manager.logger.info(f"   - 총 수익/손실: {total_return:,.0f}원")
+    log_manager.logger.info(f"   - 수익률: {return_rate:.2f}%")
+    
+    # ✅ 벤치마크 비교 (단순 보유 전략)
+    benchmark_return = ((final_price - initial_price) / initial_price) * 100
+    excess_return = return_rate - benchmark_return
+    
+    log_manager.logger.info(f"📊 벤치마크 비교 (단순 보유 전략):")
+    log_manager.logger.info(f"   - 벤치마크 수익률: {benchmark_return:.2f}%")
+    log_manager.logger.info(f"   - 초과 수익률: {excess_return:.2f}%")
+    
+    if excess_return > 0:
+        log_manager.logger.info(f"🎉 AI 모델이 단순 보유 전략보다 {excess_return:.2f}%p 더 좋은 성과를 보였습니다!")
+    else:
+        log_manager.logger.info(f"😞 AI 모델이 단순 보유 전략보다 {abs(excess_return):.2f}%p 낮은 성과를 보였습니다.")
 
     # ✅ 데이터프레임으로 변환 및 출력
     pd.set_option("display.max_rows", None)
