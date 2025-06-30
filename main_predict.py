@@ -3,6 +3,9 @@ import numpy as np
 import os
 import argparse
 import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from datetime import datetime
 from models.actor_network import ActorNetwork
 from data.data_loader import load_stock_data
 
@@ -159,6 +162,16 @@ if __name__ == "__main__":
 
     predictions = []
     probs_list = []  # ✅ 확률 리스트 저장용
+    
+    # ✅ 포트폴리오 밸류와 Buy-and-Hold 전략 추적을 위한 리스트 추가
+    portfolio_values = []
+    close_prices = []
+    buy_and_hold_values = []
+    tracking_dates = []
+    
+    # ✅ Buy-and-Hold 전략 초기 설정 (초기 자금으로 최대한 매수)
+    buy_and_hold_shares = int(initial_balance / (initial_price * (1 + transaction_fee)))
+    buy_and_hold_remaining_cash = initial_balance - (buy_and_hold_shares * initial_price * (1 + transaction_fee))
 
     # ✅ stock_data 크기만큼 앞에서 자르기
     if len(dates) > stock_data.shape[0]:
@@ -199,6 +212,17 @@ if __name__ == "__main__":
                 balance += revenue
                 print(f"전량 매도: {shares_sold}주 → 총 보유: {holding}주, 잔고: {balance:,.0f}원")
         # 관망이나 실패한 거래는 로그 출력하지 않음
+        
+        # ✅ 현재 포트폴리오 밸류 계산 및 저장
+        current_portfolio_value = balance + (holding * current_price)
+        portfolio_values.append(current_portfolio_value)
+        close_prices.append(current_price)
+        
+        # ✅ Buy-and-Hold 전략 포트폴리오 가치 계산
+        buy_and_hold_portfolio_value = buy_and_hold_remaining_cash + (buy_and_hold_shares * current_price)
+        buy_and_hold_values.append(buy_and_hold_portfolio_value)
+        
+        tracking_dates.append(pd.to_datetime(date))
 
     # ✅ 최종 포트폴리오 밸류 계산
     final_price = stock_data[-1, 0] * 10  # 마지막 주가
@@ -230,6 +254,85 @@ if __name__ == "__main__":
         log_manager.logger.info(f"🎉 AI 모델이 단순 보유 전략보다 {excess_return:.2f}%p 더 좋은 성과를 보였습니다!")
     else:
         log_manager.logger.info(f"😞 AI 모델이 단순 보유 전략보다 {abs(excess_return):.2f}%p 낮은 성과를 보였습니다.")
+
+    # ✅ Buy-and-Hold 전략 성과 계산
+    buy_and_hold_final_value = buy_and_hold_values[-1]
+    buy_and_hold_return = buy_and_hold_final_value - initial_portfolio_value
+    buy_and_hold_return_rate = (buy_and_hold_return / initial_portfolio_value) * 100
+    
+    log_manager.logger.info(f"📊 Buy-and-Hold 전략 성과:")
+    log_manager.logger.info(f"   - 매수한 주식 수: {buy_and_hold_shares}주")
+    log_manager.logger.info(f"   - 남은 현금: {buy_and_hold_remaining_cash:,.0f}원")
+    log_manager.logger.info(f"   - 최종 포트폴리오 가치: {buy_and_hold_final_value:,.0f}원")
+    log_manager.logger.info(f"   - 수익률: {buy_and_hold_return_rate:.2f}%")
+    
+    # ✅ AI vs Buy-and-Hold 비교
+    ai_vs_buy_hold_excess = return_rate - buy_and_hold_return_rate
+    log_manager.logger.info(f"🤖 AI vs Buy-and-Hold 비교:")
+    log_manager.logger.info(f"   - AI 수익률: {return_rate:.2f}%")
+    log_manager.logger.info(f"   - Buy-and-Hold 수익률: {buy_and_hold_return_rate:.2f}%")
+    log_manager.logger.info(f"   - AI 초과 수익률: {ai_vs_buy_hold_excess:.2f}%p")
+    
+    if ai_vs_buy_hold_excess > 0:
+        log_manager.logger.info(f"🎉 AI 모델이 Buy-and-Hold 전략보다 {ai_vs_buy_hold_excess:.2f}%p 더 좋은 성과를 보였습니다!")
+    else:
+        log_manager.logger.info(f"😞 AI 모델이 Buy-and-Hold 전략보다 {abs(ai_vs_buy_hold_excess):.2f}%p 낮은 성과를 보였습니다.")
+
+    # ✅ 그래프 생성 및 표시
+    log_manager.logger.info("📊 AI 포트폴리오와 Buy-and-Hold 전략 비교 그래프를 생성합니다...")
+    
+    # 그래프 설정 - 단일 y축 사용
+    plt.figure(figsize=(15, 10))
+    
+    # AI 포트폴리오와 Buy-and-Hold 포트폴리오 비교
+    plt.plot(tracking_dates, portfolio_values, 'b-', linewidth=2, label='AI Portfolio')
+    plt.plot(tracking_dates, buy_and_hold_values, 'r-', linewidth=2, label='Buy-and-Hold Strategy')
+    
+    plt.xlabel('Date', fontsize=12)
+    plt.ylabel('Portfolio Value (KRW)', fontsize=12)
+    plt.title('AI Portfolio vs Buy-and-Hold Strategy Comparison', fontsize=16, fontweight='bold')
+    plt.legend(fontsize=12)
+    plt.grid(True, alpha=0.3)
+    
+    # x축 날짜 형식 설정
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+    plt.gca().xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+    plt.setp(plt.gca().xaxis.get_majorticklabels(), rotation=45)
+    
+    # 그래프 저장
+    plt.tight_layout()
+    chart_path = "output/ai_vs_buy_hold_comparison.png"
+    plt.savefig(chart_path, dpi=300, bbox_inches='tight')
+    log_manager.logger.info(f"📈 그래프가 저장되었습니다: {chart_path}")
+    
+    # 정규화된 비교 그래프도 생성
+    plt.figure(figsize=(15, 8))
+    
+    # 정규화를 위해 초기값으로 값들을 나누어 비율로 표시
+    portfolio_normalized = np.array(portfolio_values) / initial_portfolio_value
+    buy_and_hold_normalized = np.array(buy_and_hold_values) / initial_portfolio_value
+    
+    plt.plot(tracking_dates, portfolio_normalized, 'b-', linewidth=2, label='AI Portfolio (Normalized)')
+    plt.plot(tracking_dates, buy_and_hold_normalized, 'r-', linewidth=2, label='Buy-and-Hold Strategy (Normalized)')
+    
+    plt.xlabel('Date', fontsize=12)
+    plt.ylabel('Performance Ratio (Initial = 1.0)', fontsize=12)
+    plt.title('AI Portfolio vs Buy-and-Hold Strategy Performance (Normalized)', fontsize=16, fontweight='bold')
+    plt.legend(fontsize=12)
+    plt.grid(True, alpha=0.3)
+    
+    # x축 날짜 형식 설정
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+    plt.gca().xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+    plt.setp(plt.gca().xaxis.get_majorticklabels(), rotation=45)
+    
+    plt.tight_layout()
+    normalized_chart_path = "output/ai_vs_buy_hold_normalized.png"
+    plt.savefig(normalized_chart_path, dpi=300, bbox_inches='tight')
+    log_manager.logger.info(f"📈 정규화 그래프가 저장되었습니다: {normalized_chart_path}")
+    
+    # 그래프 표시 (옵션)
+    plt.show()
 
     # ✅ 데이터프레임으로 변환 및 출력
     pd.set_option("display.max_rows", None)
