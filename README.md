@@ -1,181 +1,450 @@
-# 📈 주식 자동매매 시스템 (PPO + Transformer) (250407 최신화)
+# 🚀 AstraQuant - AI 주식 자동매매 시스템
 
-## 📌 프로젝트 개요
+**Transformer 기반 PPO 강화학습을 활용한 지능형 주식 트레이딩 시스템**
 
-본 프로젝트는 **PPO(Proximal Policy Optimization) 강화학습 알고리즘**과 **트랜스포머(Transformer) 기반 신경망**을 활용하여 **주식 자동매매 시스템**을 구현하는 것을 목표로 합니다.
-
-강화학습을 활용하여 **최적의 매매 전략**을 학습하고, 이를 실시간 시장 데이터에 적용하여 **매도(Sell) / 관망(Hold) / 매수(Buy)** 결정을 수행하는 것이 핵심 기능입니다.
-
----
-
-## 🚀 모델 개요
-
-### **1️⃣ PPO (Proximal Policy Optimization)**
-
-본 프로젝트에서는 **PPO 알고리즘을 사용하여 최적의 거래 전략을 학습**합니다. PPO는 정책 기반(Policy Gradient)과 가치 기반(Value Function)을 결합한 Actor-Critic 구조를 사용하여 학습을 진행합니다.
-
-- Actor (정책 네트워크): 주어진 상태에서 최적의 매매 결정을 수행하는 역할
-- Critic (가치 네트워크): 특정 상태의 가치를 평가하여 Actor의 업데이트를 돕는 역할
-- Clipped Objective Function을 사용하여 정책 업데이트가 과하게 변하지 않도록 안정성을 확보
-- Advantage Estimation을 통해 학습 효율성을 향상
-
-#### **🎯 액션 공간 (Action Space)**
-
-- **0: 관망 (Hold)**: 현재 포지션을 유지
-- **1: 전부 매수 (Buy All)**: 현재 잔고로 살 수 있는 최대 주식 수를 매수
-- **2: 전부 매도 (Sell All)**: 보유한 모든 주식을 매도
-
-이러한 단순화된 액션 공간을 통해 에이전트가 더 명확하고 효과적인 매매 전략을 학습할 수 있습니다.
-
-### **2️⃣ Transformer 기반 신경망**
-
-기존 강화학습 모델에서는 CNN 또는 LSTM을 사용하지만, 본 프로젝트에서는 **트랜스포머 신경망을 활용하여 시계열 데이터를 처리**합니다.
-
-- **자기회귀(Self-Attention) 메커니즘을 활용하여 장기적인 패턴을 학습**
-- **CNN, LSTM보다 더 효과적으로 금융 데이터를 처리**
-- **강화학습 환경에서 시퀀스 기반 매매 패턴을 학습하는데 적합**
+[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.6.0+-orange.svg)](https://pytorch.org/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 
 ---
 
-## 🔧 실행 방법
+## 📋 목차
 
-### **1️⃣ 필수 라이브러리 설치**
+- [프로젝트 개요](#-프로젝트-개요)
+- [주요 특징](#-주요-특징)
+- [시스템 아키텍처](#-시스템-아키텍처)
+- [설치 및 설정](#-설치-및-설정)
+- [사용 방법](#-사용-방법)
+- [프로젝트 구조](#-프로젝트-구조)
+- [설정 파일](#-설정-파일)
+- [성능 및 결과](#-성능-및-결과)
+- [기술 세부사항](#-기술-세부사항)
+- [문제 해결](#-문제-해결)
+- [기여 방법](#-기여-방법)
+- [라이선스](#-라이선스)
 
-프로젝트 실행 전에 필수 라이브러리를 설치해야 합니다.
+---
 
-```bash
-pip install -r requirements.txt
+## 🎯 프로젝트 개요
+
+AstraQuant는 **PPO(Proximal Policy Optimization) 강화학습**과 **Transformer 신경망**을 결합하여 구현된 AI 주식 자동매매 시스템입니다. 시장 데이터를 분석하여 최적의 매매 타이밍을 학습하고, 실시간으로 거래 결정을 내릴 수 있는 지능형 트레이딩 에이전트를 제공합니다.
+
+### 🎨 핵심 철학
+
+- **단순성**: 복잡한 매매 전략을 3가지 명확한 액션으로 단순화
+- **안정성**: PPO 알고리즘을 통한 안정적인 학습 과정
+- **확장성**: 모듈화된 구조로 새로운 전략 및 지표 추가 용이
+- **투명성**: 상세한 로깅과 TensorBoard 시각화 제공
+
+---
+
+## ✨ 주요 특징
+
+### 🧠 AI 기술
+
+- **PPO 강화학습**: 안정적이고 효율적인 정책 학습
+- **Transformer 아키텍처**: 시계열 데이터의 장기 의존성 포착
+- **Actor-Critic 구조**: 정책과 가치 함수의 균형잡힌 학습
+- **Epsilon-Greedy 탐험**: 탐험과 활용의 적절한 균형
+
+### 💹 트레이딩 시스템
+
+- **3가지 액션**: 관망(Hold), 전부매수(Buy All), 전부매도(Sell All)
+- **복합 보상 함수**: 단기/장기 수익률, 미래 가격 변화, 거래 수수료 등 종합 고려
+- **리스크 관리**: 포트폴리오 밸런싱 및 손실 제한
+- **실시간 분석**: 다양한 기술적 지표 활용
+
+### 🔧 기술적 특징
+
+- **모듈화 설계**: 각 컴포넌트의 독립적 개발 및 테스트 가능
+- **GPU/CPU 자동 선택**: 하드웨어 환경에 맞는 자동 최적화
+- **체크포인트 시스템**: 학습 중단 시 이어서 진행 가능
+- **메모리 최적화**: 효율적인 메모리 사용량 관리
+
+---
+
+## 🏗️ 시스템 아키텍처
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      AstraQuant Architecture                    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
+│  │  Data       │    │  Environment│    │  Agent      │          │
+│  │  Loader     │───▶│  (Gym)      │◀──▶│  (PPO)      │          │
+│  └─────────────┘    └─────────────┘    └─────────────┘          │
+│                             │                  │                │
+│  ┌─────────────┐            │         ┌─────────────┐          │
+│  │  Technical  │            │         │  Actor      │          │
+│  │  Indicators │            │         │ (Transformer)│          │
+│  └─────────────┘            │         └─────────────┘          │
+│                             │                  │                │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
+│  │  Portfolio  │    │  Reward     │    │  Critic     │          │
+│  │  Manager    │◀───│  System     │    │ (Transformer)│          │
+│  └─────────────┘    └─────────────┘    └─────────────┘          │
+│                                                                 │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
+│  │  Logger     │    │  TensorBoard│    │  Visualizer │          │
+│  │  System     │    │  Metrics    │    │  & Analyzer │          │
+│  └─────────────┘    └─────────────┘    └─────────────┘          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-✅ Python 버전: 본 프로젝트는 Python 3.10.16 환경에서 실행됩니다.
+## 📦 설치 및 설정
 
-### **2️⃣ 데이터 다운로드**
+### 시스템 요구사항
 
-프로젝트를 실행하기 전에 **주식 데이터를 다운로드하여 전처리**해야 합니다.
+- **Python**: 3.10 이상
+- **메모리**: 8GB 이상 권장
+- **GPU**: CUDA 지원 GPU (선택사항, CPU도 지원)
+- **저장공간**: 최소 2GB 이상
 
-```bash
-python data/data_cursor.ipynb
-```
+### 설치 과정
 
-이 스크립트는 다음과 같은 기능을 수행합니다:
+1. **저장소 복제**
 
-#### 📊 데이터 수집 기능
+   ```bash
+   git clone https://github.com/EazyNick/AstraQuant.git
+   cd AstraQuant
+   ```
 
-- **기본 가격 데이터**: Open, High, Low, Close, Volume
-- **기술적 지표**:
-  - RSI (상대강도지수)
-  - MACD (이동평균수렴확산지수)
-  - 볼린저 밴드 (BB)
-  - ATR (평균진폭)
-  - CCI (상품채널지수)
-  - MFI (자금흐름지수)
-  - ADX (평균방향지수)
+2. **가상환경 생성 및 활성화**
 
-#### 📈 추가 분석 지표
+   ```bash
+   conda create -n AstraQuant python=3.10
+   conda activate AstraQuant
+   ```
 
-- **가격 패턴**:
+3. **의존성 설치**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-  - 이전 고점/저점
-  - 추세선 (20일 기준)
-  - 가격 변동성
-  - 모멘텀
-  - 가격 범위
+### 주요 의존성 패키지
 
-- **거래량 프로파일**:
-  - 거래량 이동평균 (5일, 20일)
-  - VWAP (거래량가중평균가격)
-  - 거래량 변동성
-  - OBV (온밸런스볼륨)
-  - 거래량 가중 가격
-
-#### ⏰ 시간대별 데이터
-
-- 일별 데이터 (1d)
-- 주별 데이터 (1wk)
-- 월별 데이터 (1mo)
-
-#### 🔄 데이터 전처리
-
-- 모든 지표의 정규화 (MinMaxScaler)
-- 결측치 처리
-- 학습/테스트 데이터 분할
-
-데이터는 `cursor_csv` 디렉토리에 저장되며, 각 종목별로 다음 형식의 파일이 생성됩니다:
-
-- `{종목코드}_train_data.csv`: 학습 데이터
-- `{종목코드}_test_data.csv`: 테스트 데이터
+- **torch**: 2.6.0+ (딥러닝 프레임워크)
+- **gym**: 0.26.2+ (강화학습 환경)
+- **pandas**: 2.2.3+ (데이터 처리)
+- **numpy**: 2.2.2+ (수치 계산)
+- **tensorboard**: 로깅 및 시각화
+- **yfinance**: 주식 데이터 수집
+- **pandas_ta**: 기술적 지표 계산
 
 ---
 
-### **3️⃣ 모델 학습**
+## 🎮 사용 방법
 
-강화학습을 수행하여 **PPO 에이전트를 학습**합니다.
+### 1. 데이터 준비
+
+주식 데이터를 다운로드하고 전처리합니다:
 
 ```bash
-python training/train.py
+# 주피터 노트북 실행
+jupyter notebook data/data_cursor.ipynb
 ```
 
-훈련이 완료되면 `output/ppo_stock_trader.pth` 파일이 생성됩니다.
+또는 Python 스크립트로:
+
+```python
+# 데이터 로더 테스트
+python data/data_loader.py
+```
+
+### 2. 모델 훈련
+
+**기본 훈련:**
+
+```bash
+python main_train.py
+```
+
+**설정 사용자 정의:**
+
+```bash
+# config/config.yaml 파일 수정 후 실행
+python main_train.py
+```
+
+**훈련 모니터링:**
+
+```bash
+# 별도 터미널에서 실행
+tensorboard --logdir=logs/training
+```
+
+### 3. 모델 예측
+
+**기본 예측:**
+
+```bash
+python main_predict.py
+```
+
+**사용자 정의 예측:**
+
+```bash
+python main_predict.py --model_path output/ppo_stock_trader_episode_1000.pth --test_data data/cursor_csv/AMZN_test_data.csv
+```
+
+### 4. 간단한 예측 실행
+
+```bash
+python simple_predict.py
+```
 
 ---
 
-### **4️⃣ 모델 예측**
+## 📁 프로젝트 구조
 
-훈련된 모델을 사용하여 새로운 데이터를 기반으로 **매매 결정을 수행**합니다.
-
-```bash
-python main_predict.py --model_path output/ppo_stock_trader_episode_350.pth --test_data data/csv/005930.KS_combined_train_data.csv
+```
+AstraQuant/
+├── 📁 agents/                    # 강화학습 에이전트
+│   ├── __init__.py
+│   └── actor_critic_agent.py     # PPO 에이전트 구현
+├── 📁 config/                    # 설정 파일
+│   ├── __init__.py
+│   ├── config.py                 # 설정 매니저
+│   └── config.yaml              # 주요 설정 파일
+├── 📁 data/                      # 데이터 관련
+│   ├── __init__.py
+│   ├── data_loader.py           # 데이터 로더
+│   ├── csv/                     # 원본 CSV 데이터
+│   ├── cursor_csv/              # 전처리된 데이터
+│   └── *.ipynb                  # 데이터 분석 노트북
+├── 📁 env/                       # 거래 환경
+│   ├── __init__.py
+│   └── stock_env.py             # 주식 거래 환경 (Gym)
+├── 📁 models/                    # 신경망 모델
+│   ├── __init__.py
+│   ├── actor_network.py         # Actor 네트워크
+│   ├── critic_network.py        # Critic 네트워크
+│   └── positionalencoding.py    # 포지셔널 인코딩
+├── 📁 predict/                   # 예측 관련
+│   ├── __init__.py
+│   ├── model_loader.py          # 모델 로더
+│   ├── predictor.py             # 예측기
+│   ├── portfolio_analyzer.py    # 포트폴리오 분석
+│   ├── visualizer.py            # 시각화
+│   └── result_saver.py          # 결과 저장
+├── 📁 training/                  # 훈련 관련
+│   ├── __init__.py
+│   └── train.py                 # 훈련 매니저
+├── 📁 logs/                      # 로깅 시스템
+│   ├── __init__.py
+│   ├── logger.py                # 로거 설정
+│   └── 📁 log/                  # 로그 파일들
+├── 📁 output/                    # 결과 출력
+│   └── *.pth                    # 훈련된 모델들
+├── 📁 manage/                    # 관리 유틸리티
+│   ├── __init__.py
+│   └── directory.py             # 경로 관리
+├── 📁 utils/                     # 유틸리티 함수
+│   └── __init__.py
+├── main_train.py                # 메인 훈련 스크립트
+├── main_predict.py              # 메인 예측 스크립트
+├── simple_predict.py            # 간단한 예측 스크립트
+├── requirements.txt             # 의존성 패키지
+└── README.md                    # 프로젝트 문서
 ```
 
-실행 후, **날짜별 매매 신호(매수/매도/관망)와 확률 값**이 출력됩니다.
+## 📊 성능 및 결과
+
+### 훈련 메트릭
+
+- **포트폴리오 가치 변화**: 시간에 따른 포트폴리오 가치 추이
+- **보상 함수**: 단기/장기 수익률, 거래 수수료 등 종합 평가
+- **액션 분포**: 각 액션(관망/매수/매도)의 선택 빈도
+- **손실 함수**: Actor/Critic 손실 값 추이
+
+### 예측 결과
+
+예측 결과는 다음과 같이 저장됩니다:
+
+- **CSV 파일**: `output/model_predictions.csv`
+- **로그 파일**: `logs/log/` 디렉토리
+- **시각화**: 자동 생성되는 차트 및 그래프
+
+### 성과 분석
+
+- **Buy & Hold 전략과 비교**: 단순 매수 후 보유 전략과 성과 비교
+- **샤프 비율**: 위험 대비 수익률 평가
+- **최대 손실**: 최대 낙폭 분석
+- **승률**: 수익 거래 비율
 
 ---
 
-## 📊 평가 및 성능 비교
+## 🔬 기술 세부사항
 
-### **1️⃣ Buy & Hold 전략과 비교**
+### 강화학습 알고리즘
 
-- **Buy & Hold 전략**: 초기 투자금을 한 번에 매수 후 보유하는 전략
-- **PPO 강화학습 모델**: 강화학습을 통해 최적의 매매 타이밍을 학습한 전략
+**PPO (Proximal Policy Optimization)**
 
-학습된 모델이 **Buy & Hold보다 높은 수익률을 달성하는지 비교**하여 성능을 평가합니다.
+- 정책 기울기 방법의 안정성 개선
+- 클리핑을 통한 보수적인 정책 업데이트
+- Actor-Critic 구조로 효율적인 학습
 
-### **2️⃣ 모델 예측 결과 저장**
+### 신경망 아키텍처
 
-모델 예측 결과는 CSV 파일로 저장됩니다.
+**Transformer 기반 설계**
 
-```bash
-output/model_predictions.csv
-```
+- Self-Attention 메커니즘으로 시계열 패턴 학습
+- Positional Encoding으로 시간 정보 보존
+- Multi-Head Attention으로 다양한 관점 분석
 
-해당 파일을 활용하여 **매매 전략 성과 분석 및 시각화**가 가능합니다.
+### 보상 함수
+
+**복합 보상 시스템**
+
+1. **단기 수익률 보상**: 포트폴리오 가치 변화율
+2. **장기 수익률 보상**: 초기 대비 현재 수익률
+3. **보유 주식 보상**: 가격 변화에 따른 보상
+4. **미래 가격 보상**: 매매 후 가격 변화 예측
+5. **거래 수수료 패널티**: 과도한 거래 억제
+6. **수익 실현 보상**: 수익 구간에서 매도 시 보상
+7. **손실 절단 보상**: 손실 구간에서 매도 시 보상
+
+### 데이터 처리
+
+**전처리 과정**
+
+- 정규화 및 스케일링
+- 결측치 및 이상치 처리
+- 기술적 지표 계산
+- 시계열 윈도우 생성
 
 ---
 
-## 📌 결론
+## 🔧 문제 해결
 
-본 프로젝트는 강화학습을 활용하여 **최적의 주식 매매 전략을 학습하고 적용하는 시스템**을 구축합니다.
+### 자주 발생하는 문제
 
-- **PPO 알고리즘을 적용한 강화학습 모델**
-- **Transformer 기반 신경망을 활용하여 시계열 데이터 처리**
-- **Buy & Hold 전략과 비교하여 성능 평가**
-- **주식 시장 데이터(S&P 500, AAPL, TSLA 등)를 활용한 실전 적용 가능**
+**1. CUDA 메모리 부족**
 
-앞으로 추가적인 개선을 통해 **강화학습 기반 자동매매의 효율성을 극대화**할 수 있도록 발전시킬 계획입니다. 🚀
+```bash
+# 배치 크기 줄이기
+# config.yaml에서 batch_size: 8로 변경
+```
 
-## 📌 업데이트 예정
+**2. 모델 로딩 오류**
 
-- 기타 최적화 편의기능 구현 예정
+```bash
+# 모델 파일 경로 확인
+ls output/
+python main_predict.py --model_path output/your_model.pth
+```
 
-## 📌 문의 및 이슈 등록
+**3. 데이터 파일 없음**
 
-- 문의: [kkkygsos@naver.com](mailto:kkkygsos@naver.com)
-- 이슈 등록: [GitHub Issues](https://github.com/EazyNick/AstraQuant/issues)
+```bash
+# 데이터 디렉토리 생성
+mkdir -p data/cursor_csv
+# 데이터 다운로드 실행
+jupyter notebook data/data_cursor.ipynb
+```
 
-## 📌 라이선스
+### 성능 최적화
 
-본 프로젝트는 **Apache License 2.0**을 따릅니다.
+**GPU 사용 최적화**
 
-자세한 내용은 [LICENSE](http://www.apache.org/licenses/LICENSE-2.0)에서 확인할 수 있습니다.
+- 적절한 배치 크기 설정
+- 메모리 사용량 모니터링
+- 정기적인 메모리 정리
+
+**CPU 사용 최적화**
+
+- 멀티프로세싱 활용
+- 메모리 효율적인 데이터 로딩
+- 캐싱 전략 적용
+
+---
+
+## 🤝 기여 방법
+
+### 기여 가이드라인
+
+1. **이슈 생성**: 버그 리포트 또는 기능 제안
+2. **포크 & 브랜치**: 개발용 브랜치 생성
+3. **코드 작성**: 기존 코드 스타일 준수
+4. **테스트**: 충분한 테스트 수행
+5. **Pull Request**: 상세한 설명과 함께 PR 생성
+
+## 📈 향후 개발 계획
+
+### 단기 목표
+
+- [ ] 다양한 기술적 지표 추가
+- [ ] 백테스팅 시스템 구현
+- [ ] 실시간 데이터 연동
+- [ ] 웹 대시보드 개발
+
+### 장기 목표
+
+- [ ] 다중 자산 포트폴리오 지원
+- [ ] 옵션 및 파생상품 거래
+- [ ] 자동화된 하이퍼파라미터 튜닝
+- [ ] 클라우드 배포 및 스케일링
+
+---
+
+## 📞 지원 및 문의
+
+### 문의 채널
+
+- **이메일**: [kkkygsos@naver.com](mailto:kkkygsos@naver.com)
+- **GitHub Issues**: [프로젝트 이슈 페이지](https://github.com/EazyNick/AstraQuant/issues)
+- **GitHub Discussions**: 질문 및 토론
+
+---
+
+## 📄 라이선스
+
+이 프로젝트는 **Apache License 2.0** 하에 배포됩니다.
+
+```
+Copyright 2024 EazyNick
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
+
+---
+
+## 🏆 인정 사항
+
+### 참조 논문
+
+- Schulman, J., et al. "Proximal Policy Optimization Algorithms." arXiv:1707.06347 (2017)
+- Vaswani, A., et al. "Attention is All You Need." NIPS 2017
+
+### 오픈소스 기여
+
+- PyTorch 팀의 딥러닝 프레임워크
+- OpenAI Gym의 강화학습 환경
+- Hugging Face의 Transformers 라이브러리
+
+---
+
+## 🌟 즐겨찾기
+
+이 프로젝트가 도움이 되었다면 ⭐을 눌러주세요!
+
+[![GitHub stars](https://img.shields.io/github/stars/EazyNick/AstraQuant.svg?style=social&label=Star)](https://github.com/EazyNick/AstraQuant)
+[![GitHub forks](https://img.shields.io/github/forks/EazyNick/AstraQuant.svg?style=social&label=Fork)](https://github.com/EazyNick/AstraQuant)
+
+---
+
+_최종 업데이트: 2025년 07월_
