@@ -59,9 +59,18 @@ class Visualizer:
             if trading_signals['buy_dates'] and buy_portfolio_values:
                 plt.scatter(trading_signals['buy_dates'], buy_portfolio_values, 
                            color='green', marker='^', s=100, label='AI Buy Signal', zorder=5, alpha=0.8)
+                # 매수 시점에서 수직 점선 추가
+                for i, buy_date in enumerate(trading_signals['buy_dates']):
+                    if i < len(buy_portfolio_values):
+                        plt.axvline(x=buy_date, color='green', linestyle='--', alpha=0.6, linewidth=1)
+                        
             if trading_signals['sell_dates'] and sell_portfolio_values:
                 plt.scatter(trading_signals['sell_dates'], sell_portfolio_values, 
                            color='red', marker='v', s=100, label='AI Sell Signal', zorder=5, alpha=0.8)
+                # 매도 시점에서 수직 점선 추가
+                for i, sell_date in enumerate(trading_signals['sell_dates']):
+                    if i < len(sell_portfolio_values):
+                        plt.axvline(x=sell_date, color='red', linestyle='--', alpha=0.6, linewidth=1)
         
         plt.xlabel('Date', fontsize=12)
         plt.ylabel('Portfolio Value (KRW)', fontsize=12)
@@ -123,9 +132,18 @@ class Visualizer:
             if trading_signals['buy_dates'] and buy_normalized_values:
                 plt.scatter(trading_signals['buy_dates'], buy_normalized_values, 
                            color='green', marker='^', s=100, label='AI Buy Signal', zorder=5, alpha=0.8)
+                # 매수 시점에서 수직 점선 추가
+                for i, buy_date in enumerate(trading_signals['buy_dates']):
+                    if i < len(buy_normalized_values):
+                        plt.axvline(x=buy_date, color='green', linestyle='--', alpha=0.6, linewidth=1)
+                        
             if trading_signals['sell_dates'] and sell_normalized_values:
                 plt.scatter(trading_signals['sell_dates'], sell_normalized_values, 
                            color='red', marker='v', s=100, label='AI Sell Signal', zorder=5, alpha=0.8)
+                # 매도 시점에서 수직 점선 추가
+                for i, sell_date in enumerate(trading_signals['sell_dates']):
+                    if i < len(sell_normalized_values):
+                        plt.axvline(x=sell_date, color='red', linestyle='--', alpha=0.6, linewidth=1)
         
         plt.xlabel('Date', fontsize=12)
         plt.ylabel('Performance Ratio (Initial = 1.0)', fontsize=12)
