@@ -60,6 +60,12 @@ class StockTradingEnv(gym.Env):
         # ✅ TensorBoard 추가
         self.train_step = 0  # 학습 스텝 카운트
         self.total_reward = 0  # 최종 보상 추적용 변수
+        
+        # 매수/매도 추적을 위한 변수들
+        self.last_buy_price = None
+        self.last_sell_price = None
+        self.holding_duration = 0  # 보유 기간
+        self.max_holding_duration = 60  # 최대 보유 기간 (매도 압박), 장기 우상향 종목 대상
 
     def normalize_reward(self, value, scale=50000):
         value = torch.tensor(value, dtype=torch.float32).to(self.device)
@@ -87,6 +93,9 @@ class StockTradingEnv(gym.Env):
         self.last_buy_step = None  # 매수 시점 추적 초기화
         self.last_sell_step = None  # 매도 시점 추적 초기화
         self.last_sold_shares = 0  # 매도한 주식 수 초기화
+        self.last_buy_price = None  # 매수 가격 초기화
+        self.last_sell_price = None  # 매도 가격 초기화
+        self.holding_duration = 0  # 보유 기간 초기화
 
         # 🔹 기존 상태 (주가 데이터) + 보유 주식 수 추가
         state = self.stock_data[self.current_step:self.current_step + self.observation_window]
@@ -117,6 +126,14 @@ class StockTradingEnv(gym.Env):
             log_manager.logger.warning(f"[Step {self.current_step}] 경고: 유효하지 않은 가격 {price}.")
             return None, 0, True  # 가격이 NaN이면 종료
 
+        # 보유 기간 업데이트
+        if self.shares_held > 0:
+            self.holding_duration += 1
+
+        # 매수/매도 성공 여부 추적 변수
+        buy_success = False
+        sell_success = False
+
         if action == 0:
             # 관망 (Hold)
             pass
@@ -130,6 +147,13 @@ class StockTradingEnv(gym.Env):
                     cost = max_shares_possible * price * (1 + self.transaction_fee)
                     self.shares_held += max_shares_possible
                     self.balance -= cost
+                    self.last_buy_price = price  # 매수 가격 기록
+                    self.holding_duration = 0  # 보유 기간 초기화
+                    self.last_buy_step = self.current_step
+                    self.last_sell_step = None  # 매수 시 매도 시점 초기화
+                    self.last_sold_shares = 0  # 매수 시 매도 주식 수 초기화
+                    buy_success = True  # 매수 성공 표시
+                    
                     if self.train_step % 1000 == 0:
                         portfolio_value = self.balance + (self.shares_held * price)
                         log_manager.logger.debug(
@@ -145,15 +169,12 @@ class StockTradingEnv(gym.Env):
                             f"  - 포트폴리오 밸류: {portfolio_value:,.0f}원\n"
                             f"  - 스케일된 보유 주식: {self.normalize_shares_for_learning(self.shares_held):.4f}"
                         )
-                    self.last_buy_step = self.current_step
-                    self.last_sell_step = None  # 매수 시 매도 시점 초기화
-                    self.last_sold_shares = 0  # 매수 시 매도 주식 수 초기화
                 else:
-                    reward -= 0.001  # 매수 실패 패널티 (잔고 부족)
+                    reward -= 0.01  # 매수 실패 패널티 (잔고 부족)
                     if self.train_step % 1000 == 0:
                         log_manager.logger.debug(f"[Step {self.current_step}] 전부 매수 실패! 잔고 부족")
             else:
-                reward -= 0.0001  # 매수 실패 패널티 (잔고 없음)
+                reward -= 0.05  # 매수 실패 패널티 (잔고 없음)
                 if self.train_step % 1000 == 0:
                     log_manager.logger.debug(f"[Step {self.current_step}] 전부 매수 실패! 잔고 없음")
 
@@ -167,6 +188,9 @@ class StockTradingEnv(gym.Env):
                 self.last_buy_step = None  # 매도 시 매수 시점 초기화
                 self.last_sell_step = self.current_step  # 매도 시점 기록
                 self.last_sold_shares = shares_sold  # 매도한 주식 수 기록
+                self.last_sell_price = price  # 매도 가격 기록
+                self.holding_duration = 0  # 보유 기간 초기화
+                sell_success = True  # 매도 성공 표시
                 
                 if self.train_step % 1000 == 0:
                     portfolio_value = self.balance + (self.shares_held * price)
@@ -181,7 +205,7 @@ class StockTradingEnv(gym.Env):
                         f"  - 스케일된 보유 주식: {self.normalize_shares_for_learning(self.shares_held):.4f}"
                     )
             else:
-                reward -= 0.001  # 매도 실패 패널티 (보유 주식 없음)
+                reward -= 0.01  # 매도 실패 패널티 (보유 주식 없음)
                 if self.train_step % 1000 == 0:
                     log_manager.logger.debug(f"[Step {self.current_step}] 전부 매도 실패! 보유 주식 없음")
 
@@ -195,7 +219,9 @@ class StockTradingEnv(gym.Env):
         future_price_reward = 0
         sell_price_reward = 0
         transaction_penalty = 0
-        holding_encouragement = 0
+        profit_taking_reward = 0  # 수익 실현 보상
+        loss_cutting_reward = 0   # 손실 절단 보상
+        holding_pressure = 0      # 보유 압박 (장기 보유 시 패널티)
 
         # 포트폴리오 가치 변화율을 보상으로 설정 (수익률 기반 보상), 단기 수익률 보상
         if self.previous_portfolio_value > 0:
@@ -211,8 +237,8 @@ class StockTradingEnv(gym.Env):
             price_change = (price - prev_price) / prev_price
             holding_reward = price_change * self.shares_held * 0.1
 
-        # 4. 매수 후 미래 가격 변화 보상 (새로 추가)
-        if self.shares_held > 0 and self.last_buy_step is not None:
+        # 4. 매수 후 미래 가격 변화 보상 (매수 성공 시에만 적용)
+        if buy_success and self.shares_held > 0 and self.last_buy_step is not None:
             steps_since_buy = self.current_step - self.last_buy_step
             
             # 매수 후 1-5 스텝 동안의 가격 변화를 고려
@@ -230,6 +256,7 @@ class StockTradingEnv(gym.Env):
                 if self.train_step % 1000 == 0:
                     log_manager.logger.debug(
                         f"[Step {self.current_step}] 매수 후 미래 가격 변화 보상:\n"
+                        f"  - 매수 성공: {buy_success}\n"
                         f"  - 매수 스텝: {self.last_buy_step}\n"
                         f"  - 매수 후 경과 스텝: {steps_since_buy}\n"
                         f"  - 매수 가격: {buy_price:,.0f}원\n"
@@ -239,8 +266,8 @@ class StockTradingEnv(gym.Env):
                         f"  - 보상: {future_price_reward:.6f}"
                     )
 
-        # 5. 매도 후 미래 가격 변화 보상 (새로 추가)
-        if self.shares_held == 0 and self.last_sell_step is not None:
+        # 5. 매도 후 미래 가격 변화 보상 (매도 성공 시에만 적용)
+        if sell_success and self.shares_held == 0 and self.last_sell_step is not None:
             steps_since_sell = self.current_step - self.last_sell_step
             
             # 매도 후 1-5 스텝 동안의 가격 변화를 고려
@@ -258,6 +285,7 @@ class StockTradingEnv(gym.Env):
                 if self.train_step % 1000 == 0:
                     log_manager.logger.debug(
                         f"[Step {self.current_step}] 매도 후 미래 가격 변화 보상:\n"
+                        f"  - 매도 성공: {sell_success}\n"
                         f"  - 매도 스텝: {self.last_sell_step}\n"
                         f"  - 매도 후 경과 스텝: {steps_since_sell}\n"
                         f"  - 매도 가격: {sell_price:,.0f}원\n"
@@ -267,16 +295,36 @@ class StockTradingEnv(gym.Env):
                         f"  - 보상: {sell_price_reward:.6f}"
                     )
 
-        # 6. 거래 수수료 패널티
-        if action > 0:  # 매수나 매도 행동을 했을 때
+        # 6. 거래 수수료 패널티 (매수/매도 성공 시에만 적용)
+        if (buy_success or sell_success):  # 매수나 매도가 성공했을 때만
             transaction_penalty = -self.transaction_fee * 0.01
 
-        # 7. 보유 주식 장려 보상 (새로 추가)
-        if self.shares_held > 0:
-            holding_encouragement = 0.001 * self.shares_held  # 보유 주식 수에 비례한 보상
+        # 7. 수익 실현 보상 (매도 성공 시 수익이 있을 때)
+        if sell_success and self.last_buy_price is not None:  # 매도 성공이고 매수 가격이 기록되어 있을 때
+            profit_rate = (price - self.last_buy_price) / self.last_buy_price
+            if profit_rate > 0.02:  # 2% 이상 수익 시
+                profit_taking_reward = profit_rate * 5.0  # 수익률에 비례한 보상
+                if self.train_step % 1000 == 0:
+                    log_manager.logger.debug(f"[Step {self.current_step}] 수익 실현 보상: {profit_taking_reward:.6f} (수익률: {profit_rate:.4f})")
+
+        # 8. 손실 절단 보상 (매도 성공 시 손실이 있을 때)
+        if sell_success and self.last_buy_price is not None:  # 매도 성공이고 매수 가격이 기록되어 있을 때
+            loss_rate = (self.last_buy_price - price) / self.last_buy_price
+            if loss_rate > 0.01:  # 1% 이상 손실 시
+                loss_cutting_reward = loss_rate * 2.0  # 손실 절단에 대한 보상
+                if self.train_step % 1000 == 0:
+                    log_manager.logger.debug(f"[Step {self.current_step}] 손실 절단 보상: {loss_cutting_reward:.6f} (손실률: {loss_rate:.4f})")
+
+        # 9. 보유 압박 (장기 보유 시 패널티) - 매도 유도
+        if self.shares_held > 0 and self.holding_duration > self.max_holding_duration:
+            holding_pressure = -0.01 * (self.holding_duration - self.max_holding_duration)  # 보유 기간이 길수록 패널티
+            if self.train_step % 1000 == 0:
+                log_manager.logger.debug(f"[Step {self.current_step}] 보유 압박 패널티: {holding_pressure:.6f} (보유 기간: {self.holding_duration})")
 
         # 최종 보상 계산
-        reward = short_term_reward + long_term_reward + holding_reward + future_price_reward + sell_price_reward + transaction_penalty + holding_encouragement
+        reward = (short_term_reward + long_term_reward + holding_reward + 
+                 future_price_reward + sell_price_reward + transaction_penalty + 
+                 profit_taking_reward + loss_cutting_reward + holding_pressure)
         self.total_reward += reward
 
         # TensorBoard 기록
@@ -290,6 +338,9 @@ class StockTradingEnv(gym.Env):
             self.writer.add_scalar("Reward/Future-Price", future_price_reward, self.train_step)
             self.writer.add_scalar("Reward/Sell-Price", sell_price_reward, self.train_step)
             self.writer.add_scalar("Reward/Transaction", transaction_penalty, self.train_step)
+            self.writer.add_scalar("Reward/Profit-Taking", profit_taking_reward, self.train_step)
+            self.writer.add_scalar("Reward/Loss-Cutting", loss_cutting_reward, self.train_step)
+            self.writer.add_scalar("Reward/Holding-Pressure", holding_pressure, self.train_step)
             self.writer.add_scalar("Reward/Total", reward, self.train_step)
 
         # 보상 정규화
