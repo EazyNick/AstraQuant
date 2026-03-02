@@ -1,12 +1,40 @@
 """
 [Workflow 흐름 요약]
 (1) 환경에서 상태(state: [seq_len, feature_dim])를 받는다
+- Sequence Length: 모델에 몇 개의 과거 시점 데이터를 한 번에 넣을 것인가, 즉 observation_window size
+- feature_dim: 한 시점에 몇 개의 정보가 있는지
 (2) select_action(state):
-    - state를 Tensor로 변환해 device로 보낸다
+    - state를 Tensor로 변환해 device(연산 장치)로 보낸다. 모델과 데이터는 같은 장치에서 연산이 이루어져야 함
     - actor(state)로 logits -> softmax(temperature 적용) 확률 분포(probs) 생성
+    Actor란? 상태(state)를 입력받아 각 행동의 점수를 출력하는 신경망
+    logits = "정규화되지 않은 점수"
+    softmax는 점수를 확률로 바꿔주는 함수
+    temperature는 확률을 뾰족하게 만들지, 평평하게 만들지 조절하는 값
+    state (30일 주가 데이터)
+            ↓
+    Actor 신경망
+            ↓
+    logits = [2.3, 0.5, -1.2]
+            ↓
+    softmax (temperature 적용)
+            ↓
+    probs = [0.79, 0.17, 0.04] (합이 1)
     - epsilon-greedy로 (랜덤 탐험 or dist.sample 기반 정책 샘플링) action 선택
+    dist 👉 확률 분포 객체
+    dist.sample: 확률 분포에 따라 랜덤으로 하나 뽑는 것(일반 랜덤과는 특정 숫자가 나올 확률이 다르다)
     - 선택한 action의 log_prob를 계산하고, critic(state)로 value(V(s))를 추정한다
+    log_prob: 확률에 log(로그)를 씌운 값, 확률이 낮을수록 더 작은(더 음수) 값이 됨.
+    로그를 쓰면:
+    확률 곱셈 → 덧셈으로 바뀜
+    수치 안정성 좋아짐
+    미분 계산 쉬움
     - (action, log_prob, value)를 반환한다
+    Critic: "지금 상태가 얼마나 좋은 상태인가?"를 평가하는 신경망
+    | 구분    | 역할                |
+    | ------ | ----------------- |
+    | Actor  | 어떤 행동을 할지 결정      |
+    | Critic | 현재 상태가 얼마나 좋은지 평가 |
+
 (3) 외부에서 reward를 받고 transition (state, action, reward, log_prob, value)를 memory에 저장한다
 (4) update(memory):
     - memory를 텐서로 변환
